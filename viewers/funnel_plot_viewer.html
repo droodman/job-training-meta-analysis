@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Funnel Plot Viewer</title>
+<style>
+  body { font-family: "Segoe UI", Arial, sans-serif; margin: 20px; background: #fff; }
+  h1 { font-family: "Styrene B", sans-serif; font-size: 1.4em; margin-bottom: 10px; }
+  .controls { font-family: "Styrene B", sans-serif; }
+  .layout { display: flex; gap: 20px; align-items: flex-start; }
+  .controls { display: flex; flex-direction: column; gap: 14px;
+              padding: 12px 16px; min-width: 210px; position: sticky; top: 20px; }
+  .control-group { display: flex; flex-direction: column; gap: 2px; }
+  .control-group .group-label { font-size: 0.8em; font-weight: 600; color: #555;
+                          text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px; }
+  .control-group label { font-size: 0.9em; cursor: pointer; }
+  .control-group input[type=radio] { margin-right: 4px; }
+  input[type=range] { width: 100%; }
+  .plot-container { flex: 1; }
+  .plot-container img { background: #fff; }
+  .zoom-value { font-size: 0.9em; color: #333; text-align: center; }
+  .filename { font-size: 0.85em; color: #888; margin-top: 6px; }
+  .missing { color: #c00; font-style: italic; padding: 40px; }
+</style>
+</head>
+<body>
+<h1>Funnel Plot Viewer</h1>
+<div class="layout">
+<div class="controls">
+  <div class="control-group">
+    <div class="group-label">Outcome</div>
+    <label><input type="radio" name="outcome" value="emp" checked> Employment</label>
+    <label><input type="radio" name="outcome" value="earn"> Earnings</label>
+  </div>
+  <div class="control-group">
+    <div class="group-label">Time horizon</div>
+    <label><input type="radio" name="horizon" value="st" checked> Short-term (~1-year)</label>
+    <label><input type="radio" name="horizon" value="mt"> Medium-term (~2-year)</label>
+    <label><input type="radio" name="horizon" value="lt"> Long-term (>~3-year)</label>
+  </div>
+  <div class="control-group">
+    <div class="group-label">Sample</div>
+    <label><input type="radio" name="sample" value="" checked> Full sample</label>
+    <label><input type="radio" name="sample" value="_primary"> Training is primary in intervention</label>
+  </div>
+  <div class="control-group">
+    <div class="group-label">Grouping</div>
+    <label><input type="radio" name="grouping" value="" checked> (none)</label>
+    <label><input type="radio" name="grouping" value="_decade"> Decade</label>
+    <label><input type="radio" name="grouping" value="_mandatory"> Mandatory/voluntary</label>
+    <label><input type="radio" name="grouping" value="_modality"> Training modality</label>
+    <label><input type="radio" name="grouping" value="_duration"> Treatment duration (&lt;6 / &ge;6 mo.)</label>
+    <label><input type="radio" name="grouping" value="_geo"> Urban/rural</label>
+    <label><input type="radio" name="grouping" value="_sector"> Sector program</label>
+    <label><input type="radio" name="grouping" value="_funding"> Funding source</label>
+    <label><input type="radio" name="grouping" value="_academic"> Academic source</label>
+    <label><input type="radio" name="grouping" value="_region"> Census region</label>
+    <label><input type="radio" name="grouping" value="_targetpop"> Target population</label>
+    <label><input type="radio" name="grouping" value="_age"> Mean age</label>
+    <label><input type="radio" name="grouping" value="_scaled"> Scaled</label>
+    <label><input type="radio" name="grouping" value="_datasource"> Data source</label>
+    <label><input type="radio" name="grouping" value="_gender"> Gender majority</label>
+    <label><input type="radio" name="grouping" value="_employengage"> Employer engagement in curriculum</label>
+    <label><input type="radio" name="grouping" value="_resprate"> Outcome response rate</label>
+  </div>
+  <div class="control-group">
+    <div class="group-label">Zoom</div>
+    <input type="range" id="zoom" min="20" max="100" value="75" step="5">
+    <div class="zoom-value" id="zoomLabel">75%</div>
+  </div>
+</div>
+<div class="plot-container">
+  <img id="plot" src="" alt="Funnel plot">
+  <div class="filename" id="filename"></div>
+</div>
+</div>
+<script>
+function getRadio(name) {
+  return document.querySelector(`input[name="${name}"]:checked`).value;
+}
+function update() {
+  const oc = getRadio('outcome');
+  const hz = getRadio('horizon');
+  const grp = getRadio('grouping');
+  const sm = getRadio('sample');
+  const zoom = document.getElementById('zoom').value;
+  const fn = grp === ''
+    ? `funnel_${oc}_${hz}${sm}.png`
+    : `funnel_${oc}_${hz}${grp}${sm}.png`;
+  const img = document.getElementById('plot');
+  const label = document.getElementById('filename');
+  const scrollY = window.scrollY;
+  img.style.maxWidth = zoom + '%';
+  document.getElementById('zoomLabel').textContent = zoom + '%';
+  img.onerror = function() {
+    img.style.display = 'none';
+    label.innerHTML = `<span class="missing">File not found: ${fn}</span>`;
+  };
+  img.onload = function() {
+    img.style.display = '';
+    label.textContent = fn;
+    window.scrollTo(0, scrollY);
+  };
+  img.src = '../output/' + fn;
+}
+document.querySelectorAll('input[type=radio]').forEach(r => r.addEventListener('change', update));
+document.getElementById('zoom').addEventListener('input', update);
+update();
+</script>
+</body>
+</html>
