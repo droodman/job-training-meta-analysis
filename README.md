@@ -6,4 +6,4 @@
 - [Meta-regressions](viewers/table_viewer.html)
 - [Benefit-cost scatters](viewers/scatter_plot_viewer.html)
 
-Nearly all data extraction done by Claude, under supervision. "Claude is AI and can make mistakes."
+Most data extraction done by Claude, under supervision. "Claude is AI and can make mistakes."
