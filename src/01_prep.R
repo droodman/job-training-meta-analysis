@@ -21,8 +21,8 @@ library(readxl)
 
 # ── 1. Read data ─────────────────────────────────────────────────────────────
 
-dat <- read_excel("data/extraction_full_v15.xlsx", sheet = "Data Table")
-reasoning <- read_excel("data/extraction_full_v15.xlsx", sheet = "Reasoning Table")
+dat <- read_excel("data/extraction_full_v17.xlsx", sheet = "Data Table")
+reasoning <- read_excel("data/extraction_full_v17.xlsx", sheet = "Reasoning Table")
 
 cat("Raw data:", nrow(dat), "rows x", ncol(dat), "cols\n")
 

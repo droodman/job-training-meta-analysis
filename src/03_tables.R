@@ -11,7 +11,6 @@ library(metafor)
 library(mice)
 library(flextable)
 library(officer)
-library(glmnet)
 
 set.seed(20260402)
 
@@ -387,170 +386,6 @@ compute_survivor_panel <- function(hz, oc_type, approach, sm) {
   list(fit = fit, survivors = survivors)
 }
 
-# ── 5b2. Lasso meta-regression via glmnet + cluster bootstrap ───────────────
-#
-# Frequentist Lasso meta-regression. The candidate moderators are the union
-# of all seven group formulas. Variance weights are 1 / (vi + tau2_hat),
-# where tau2_hat is REML-estimated by metafor::rma() on the same panel; this
-# is more principled than 1/vi alone (it accounts for residual heterogeneity).
-# Penalty selected by 10-fold CV at lambda.min (minimum CV error). Standard
-# errors come from a project-clustered bootstrap (B reps); under MI each rep
-# also picks a random imputation, so within-imputation noise (resampling)
-# and between-imputation noise (Rubin) are folded into one SE.
-
-LASSO_BOOT_B <- 200L
-
-fit_lasso_spec <- function(hz, oc_type, approach, sample_idx,
-                           B = LASSO_BOOT_B) {
-  if (!requireNamespace("glmnet", quietly = TRUE)) return(NULL)
-  imp_col <- paste0(hz, "_", oc_type, "_impact")
-  se_col  <- paste0(hz, "_", oc_type, "_se")
-  idx <- panel_idx(hz, oc_type, sample_idx)
-  if (length(idx) < 5) return(NULL)
-
-  # Union of moderators across the seven group formulas.
-  specs <- make_specs(oc_type, hz, approach)
-  all_terms <- unique(unlist(lapply(specs, function(s)
-                                    attr(terms(s$formula), "term.labels"))))
-
-  # Build (X, y, vi, project) for one dataset (CC: dat[idx,]; MI: imp i).
-  build_matrices <- function(d) {
-    d <- as.data.frame(d)
-    d$yi <- dat[[imp_col]][idx]
-    d$vi <- dat[[se_col]][idx]^2
-    d$project <- dat$project[idx]
-    keep <- intersect(c(all_terms, "yi", "vi", "project"), names(d))
-    d_sub <- d[, keep, drop = FALSE]
-    cc <- complete.cases(d_sub)
-    if (sum(cc) < 5) return(NULL)
-    d_cc <- droplevels(d_sub[cc, , drop = FALSE])
-    drop_terms <- names(d_cc)[vapply(d_cc, function(x) {
-      if (is.factor(x))  return(nlevels(x) < 2)
-      if (is.numeric(x)) return(length(unique(x)) < 2)
-      FALSE
-    }, logical(1))]
-    drop_terms <- intersect(drop_terms, all_terms)
-    if (length(drop_terms) > 0) d_cc[drop_terms] <- NULL
-    use_terms <- setdiff(all_terms, drop_terms)
-    if (length(use_terms) == 0) return(NULL)
-    f <- as.formula(paste("~", paste(use_terms, collapse = " + ")))
-    X <- model.matrix(f, data = d_cc)
-    if ("(Intercept)" %in% colnames(X)) X <- X[, -1, drop = FALSE]
-    # Mean-center continuous columns. Without this, the Lasso intercept
-    # extrapolates to (year 0, age 0, all percentages 0); a small coefficient
-    # on randomization_midpoint (~ -13) times mean(year) ~ 1998 dominates,
-    # so the displayed intercept blows up to tens of thousands while the
-    # model itself fits correctly. Centering shifts the intercept to the
-    # predicted value at typical-X (ref factor levels, mean continuous);
-    # slopes and predictions for actual data are unchanged.
-    is_cont <- vapply(seq_len(ncol(X)), function(j) {
-      v <- unique(X[, j])
-      !(length(v) <= 2 && all(v %in% c(0, 1)))
-    }, logical(1))
-    if (any(is_cont)) {
-      X[, is_cont] <- sweep(X[, is_cont, drop = FALSE], 2,
-                            colMeans(X[, is_cont, drop = FALSE]))
-    }
-    list(X = X, y = d_cc$yi, vi = d_cc$vi, project = d_cc$project)
-  }
-
-  # REML tau^2 from a no-moderator meta-analysis (used for variance weights).
-  tau2_hat <- function(y, vi) {
-    f <- tryCatch(metafor::rma(yi = y, vi = vi, method = "REML"),
-                  error = function(e) NULL)
-    if (is.null(f)) 0 else max(f$tau2, 0)
-  }
-
-  # CV-tuned point estimate at lambda.min on a single dataset.
-  fit_lasso_cv <- function(X, y, vi) {
-    tau2 <- tau2_hat(y, vi)
-    w <- 1 / (vi + tau2)
-    cvfit <- tryCatch(
-      glmnet::cv.glmnet(X, y, weights = w, alpha = 1, nfolds = 10),
-      error = function(e) NULL)
-    if (is.null(cvfit)) return(NULL)
-    list(beta = as.numeric(coef(cvfit, s = "lambda.min")),
-         lambda = cvfit$lambda.min, tau2 = tau2)
-  }
-
-  # Refit at a fixed lambda (no CV) — used in each bootstrap rep.
-  fit_lasso_at_lambda <- function(X, y, vi, lambda, tau2) {
-    w <- 1 / (vi + tau2)
-    f <- tryCatch(glmnet::glmnet(X, y, weights = w, alpha = 1,
-                                 lambda = lambda),
-                  error = function(e) NULL)
-    if (is.null(f)) return(NULL)
-    as.numeric(coef(f, s = lambda))
-  }
-
-  # Datasets to fit on (CC: 1; MI: m_imp imputations).
-  if (approach == "cc") {
-    imps <- list(dat[idx, , drop = FALSE])
-  } else {
-    imps <- lapply(seq_len(m_imp), function(i) {
-      d_i <- complete(imp, i)[idx, , drop = FALSE]
-      d_i$census_region   <- dat$census_region[idx]
-      d_i$census_division <- dat$census_division[idx]
-      d_i
-    })
-  }
-  mats <- Filter(Negate(is.null), lapply(imps, build_matrices))
-  if (length(mats) == 0) return(NULL)
-
-  # Reference variable list = intersection of columns across imputations
-  # (handles MI imputations where droplevels leaves slightly different sets).
-  ref_terms <- Reduce(intersect, lapply(mats, function(m) colnames(m$X)))
-  if (length(ref_terms) == 0) return(NULL)
-  ref_names <- c("intrcpt", ref_terms)
-  mats <- lapply(mats, function(m) {
-    list(X = m$X[, ref_terms, drop = FALSE],
-         y = m$y, vi = m$vi, project = m$project)
-  })
-
-  # Point estimate: per-imputation CV-Lasso at lambda.min, averaged.
-  cv_results <- lapply(mats, function(m) fit_lasso_cv(m$X, m$y, m$vi))
-  cv_results <- Filter(Negate(is.null), cv_results)
-  if (length(cv_results) == 0) return(NULL)
-  beta_imp <- do.call(rbind, lapply(cv_results, `[[`, "beta"))
-  beta_hat <- colMeans(beta_imp)
-
-  # Cluster bootstrap: each rep picks a random imputation, resamples the 56
-  # projects with replacement, refits glmnet at that imputation's lambda.min.
-  beta_boot <- matrix(NA_real_, nrow = B, ncol = length(ref_names))
-  for (b in seq_len(B)) {
-    j <- sample(length(mats), 1L)
-    m <- mats[[j]]
-    cv_j <- cv_results[[min(j, length(cv_results))]]
-    projs <- unique(m$project)
-    sampled <- sample(projs, length(projs), replace = TRUE)
-    rows <- unlist(lapply(sampled, function(p) which(m$project == p)))
-    if (length(rows) < 5) next
-    bb <- fit_lasso_at_lambda(m$X[rows, , drop = FALSE], m$y[rows],
-                              m$vi[rows], cv_j$lambda, cv_j$tau2)
-    if (!is.null(bb) && length(bb) == length(ref_names)) beta_boot[b, ] <- bb
-  }
-  beta_se <- apply(beta_boot, 2, sd, na.rm = TRUE)
-  pvals <- 2 * pnorm(-abs(beta_hat / beta_se))
-  pvals[!is.finite(pvals)] <- 1
-
-  k_used <- round(mean(vapply(mats, function(m) nrow(m$X), integer(1))))
-
-  if (approach == "cc") {
-    list(beta = matrix(beta_hat, ncol = 1,
-                       dimnames = list(ref_names, NULL)),
-         se   = setNames(beta_se, ref_names),
-         pval = setNames(pvals,   ref_names),
-         k    = k_used,
-         R2   = NA_real_)
-  } else {
-    list(beta = setNames(beta_hat, ref_names),
-         se   = setNames(beta_se,  ref_names),
-         p    = setNames(pvals,    ref_names),
-         k    = k_used,
-         R2   = NA_real_)
-  }
-}
-
 # ── 5c. Survivor correlation matrices ────────────────────────────────────────
 #
 # For each panel, write an HTML correlation matrix on the model.matrix
@@ -663,7 +498,7 @@ fmt_stars <- function(p) {
     ifelse(p < 0.10, "*", ""))))
 }
 
-get_coef_cell <- function(fit, varname, dig, approach, shrink_to_dash = FALSE) {
+get_coef_cell <- function(fit, varname, dig, approach) {
   if (is.null(fit)) return(list(coef = "", se = "\u00a0"))
   if (approach == "cc") {
     nms <- rownames(fit$beta)
@@ -674,14 +509,6 @@ get_coef_cell <- function(fit, varname, dig, approach, shrink_to_dash = FALSE) {
     j <- match(varname, names(fit$beta))
     if (is.na(j)) return(list(coef = "", se = "\u00a0"))
     b <- fit$beta[j]; s <- fit$se[j]; p <- fit$p[j]
-  }
-  # In the Lasso column, treat any coefficient that rounds to zero at the
-  # displayed precision as "not selected" — show a dash and no SE. Bootstrap
-  # SEs at a Lasso boundary estimate of 0 can be substantial (different
-  # resamples select the variable at the same lambda), but reporting
-  # "0.00 (1.34)" is misleading.
-  if (isTRUE(shrink_to_dash) && !is.na(b) && round(b, dig) == 0) {
-    return(list(coef = "", se = " "))
   }
   # Use Unicode minus sign (U+2212) instead of hyphen for negative values
   coef_str <- gsub("-", "\u2212", sprintf("%s%s",
@@ -744,10 +571,6 @@ build_panel_rows <- function(hz, oc_type, oc_label, dig, approach, col_ids, sm) 
   survivor_panel_cache[[paste(sm$suffix, approach, hz, oc_type, sep = "/")]] <<-
     list(fit = fits[["(8)"]], survivors = survivors)
 
-  # Column (9): Lasso meta-regression on the union of all moderators.
-  cat(sprintf("    Lasso fit (%s/%s/%s)...\n", oc_type, hz, sm$name))
-  fits[["(9)"]] <- fit_lasso_spec(hz, oc_type, approach, sm$idx)
-
   all_rows <- list()
 
   # Moderator rows by section
@@ -761,8 +584,7 @@ build_panel_rows <- function(hz, oc_type, oc_label, dig, approach, col_ids, sm) 
       for (rtype in c("coef", "se")) {
         vals <- c(if (rtype == "coef") sprintf("  %s", display_label) else "")
         for (cn in col_ids) {
-          cell <- get_coef_cell(fits[[cn]], varname, dig, approach,
-                                shrink_to_dash = (cn == "(9)"))
+          cell <- get_coef_cell(fits[[cn]], varname, dig, approach)
           vals <- c(vals, cell[[rtype]])
         }
         names(vals) <- c("variable", col_ids)
@@ -780,8 +602,7 @@ build_panel_rows <- function(hz, oc_type, oc_label, dig, approach, col_ids, sm) 
   for (rtype in c("coef", "se")) {
     vals <- c(if (rtype == "coef") "  Intercept" else "")
     for (cn in col_ids) {
-      cell <- get_coef_cell(fits[[cn]], "intrcpt", dig, approach,
-                            shrink_to_dash = (cn == "(9)"))
+      cell <- get_coef_cell(fits[[cn]], "intrcpt", dig, approach)
       vals <- c(vals, cell[[rtype]])
     }
     names(vals) <- c("variable", col_ids)
@@ -821,8 +642,8 @@ rows_to_df <- function(all_rows) {
 
 # Style a flextable from df + row_types. `setup_header`, if non-NULL, is a
 # function(ft) -> ft that sets header labels/spans/bolding for the table; the
-# default labels columns 1..(ncols-2) blank and the last two "Survivors" /
-# "Lasso", as expected by the per-horizon panel tables.
+# default labels columns 1..(ncols-1) blank and the last column "Survivors",
+# as expected by the per-horizon panel tables.
 style_table <- function(df, row_types, caption, footer_note, fontname = NULL,
                         setup_header = NULL) {
   ncols  <- ncol(df)
@@ -834,10 +655,10 @@ style_table <- function(df, row_types, caption, footer_note, fontname = NULL,
   ft <- flextable(df)
 
   if (is.null(setup_header)) {
-    header_labels <- as.list(setNames(c(rep("", ncols - 2L),
-                                        "Survivors", "Lasso"), names(df)))
+    header_labels <- as.list(setNames(c(rep("", ncols - 1L),
+                                        "Survivors"), names(df)))
     ft <- set_header_labels(ft, values = header_labels)
-    ft <- bold(ft, j = c(ncols - 1L, ncols), part = "header")
+    ft <- bold(ft, j = ncols, part = "header")
   } else {
     ft <- setup_header(ft)
   }
@@ -895,7 +716,7 @@ panels <- list(
   list(oc = "earn", label = "Earnings impacts (2025$, annualized)", dig = 0)
 )
 
-col_ids <- c("(1)", "(2)", "(3)", "(4)", "(5)", "(6)", "(7)", "(8)", "(9)")
+col_ids <- c("(1)", "(2)", "(3)", "(4)", "(5)", "(6)", "(7)", "(8)")
 
 footer_note <- function(approach) {
   paste("Notes: Standard errors in parentheses.",
@@ -1244,8 +1065,8 @@ desc_row_defs <- list(
        ))
 )
 
-# Override style_table's default header (which expects 9 columns and uses
-# "Survivors"/"Lasso") with the three subsample labels.
+# Override style_table's default header (which expects 8 columns and labels
+# the last "Survivors") with the three subsample labels.
 apply_desc_headers <- function(ft) {
   # Sub-header row: Mean / SE / N for each sample group.
   ft <- set_header_labels(ft, values = list(
