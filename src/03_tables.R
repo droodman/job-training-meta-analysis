@@ -1186,43 +1186,43 @@ descriptive_sw_value <- function(varname, subset_idx) {
   na_pair
 }
 
-build_descriptive_rows_sw <- function() {
-  primary_idx <- which(!is.na(dat$training_role) & dat$training_role == "primary")
-  all_idx     <- seq_len(nrow(dat))
-  desc_col_ids <- c("all_mean",     "all_se",     "all_n",
-                    "primary_mean", "primary_se", "primary_n")
+primary_idx <- which(!is.na(dat$training_role) & dat$training_role == "primary")
+all_idx     <- seq_len(nrow(dat))
+desc_col_ids <- c("all_mean",     "all_se",     "all_n",
+                  "primary_mean", "primary_se", "primary_n")
 
-  fmt_v_cells <- function(stats, digits = 2, big_mark = "") {
-    if (is.na(stats[["mean"]])) return(c("–", "", ""))
-    m <- formatC(stats[["mean"]], format = "f", digits = digits,
-                 big.mark = big_mark)
-    se_str <- if (is.na(stats[["sd"]])) "" else
-      formatC(stats[["sd"]], format = "f", digits = digits,
-              big.mark = big_mark)
-    n_str <- if (is.na(stats[["n"]]) || stats[["n"]] == 0) ""
-             else as.character(stats[["n"]])
-    c(m, se_str, n_str)
-  }
-  fmt_row <- function(label, vals, digits = 2) {
-    big_mark <- if (grepl("\\$|sample size", label, ignore.case = TRUE)) ","
-                else ""
-    out <- c(sprintf("  %s", label),
-             fmt_v_cells(vals[[1]], digits, big_mark),
-             fmt_v_cells(vals[[2]], digits, big_mark))
-    names(out) <- c("variable", desc_col_ids)
-    out
-  }
-  blank_row <- function() {
-    bv <- rep("", length(desc_col_ids) + 1L)
-    names(bv) <- c("variable", desc_col_ids)
-    list(values = bv, type = "blank")
-  }
-  section_row <- function(title) {
-    sr <- c(title, rep("", length(desc_col_ids)))
-    names(sr) <- c("variable", desc_col_ids)
-    list(values = sr, type = "section")
-  }
+fmt_v_cells <- function(stats, digits = 2, big_mark = "") {
+  if (is.na(stats[["mean"]])) return(c("–", "", ""))
+  m <- formatC(stats[["mean"]], format = "f", digits = digits,
+               big.mark = big_mark)
+  se_str <- if (is.na(stats[["sd"]])) "" else
+    formatC(stats[["sd"]], format = "f", digits = digits,
+            big.mark = big_mark)
+  n_str <- if (is.na(stats[["n"]]) || stats[["n"]] == 0) ""
+           else as.character(stats[["n"]])
+  c(m, se_str, n_str)
+}
+fmt_row <- function(label, vals, digits = 2) {
+  big_mark <- if (grepl("\\$|sample size", label, ignore.case = TRUE)) ","
+              else ""
+  out <- c(sprintf("  %s", label),
+           fmt_v_cells(vals[[1]], digits, big_mark),
+           fmt_v_cells(vals[[2]], digits, big_mark))
+  names(out) <- c("variable", desc_col_ids)
+  out
+}
+blank_row <- function() {
+  bv <- rep("", length(desc_col_ids) + 1L)
+  names(bv) <- c("variable", desc_col_ids)
+  list(values = bv, type = "blank")
+}
+section_row <- function(title) {
+  sr <- c(title, rep("", length(desc_col_ids)))
+  names(sr) <- c("variable", desc_col_ids)
+  list(values = sr, type = "section")
+}
 
+build_traits_rows <- function() {
   rows <- list()
   for (i in seq_along(desc_row_defs)) {
     rd <- desc_row_defs[[i]]
@@ -1238,61 +1238,82 @@ build_descriptive_rows_sw <- function() {
         type = "coef")
     }
   }
-  rows[[length(rows) + 1]] <- blank_row()
-  rows[[length(rows) + 1]] <- section_row("Impacts")
-  outcomes <- list(
-    list("st_emp_impact",  "Employment, short-term (%)",      1L),
-    list("mt_emp_impact",  "Employment, medium-term (%)",     1L),
-    list("lt_emp_impact",  "Employment, long-term (%)",       1L),
-    list("st_earn_impact", "Earnings, short-term (2025 $)",   0L),
-    list("mt_earn_impact", "Earnings, medium-term (2025 $)",  0L),
-    list("lt_earn_impact", "Earnings, long-term (2025 $)",    0L)
-  )
-  for (oc in outcomes) {
-    col <- oc[[1]]; lab <- oc[[2]]; digits_oc <- oc[[3]]
-    se_col <- sub("_impact$", "_se", col)
-    vals <- list(
-      ms_reml(dat[[col]][all_idx],     dat[[se_col]][all_idx],
-              dat$project[all_idx]),
-      ms_reml(dat[[col]][primary_idx], dat[[se_col]][primary_idx],
-              dat$project[primary_idx]))
-    rows[[length(rows) + 1]] <- list(
-      values = fmt_row(lab, vals, digits = digits_oc),
-      type = "coef")
-  }
   rows
 }
 
-desc_rows_sw <- build_descriptive_rows_sw()
-desc_obj_sw  <- rows_to_df(desc_rows_sw)
-desc_caption_sw <- "REML-pooled impacts and unweighted trait means by training-role subgroup"
-desc_footer_sw  <- paste(
-  "Notes: Impact rows use REML meta-analytic pooling on the reported",
-  "per-study standard errors; the SD column there is the project-clustered",
-  "(CR1) standard error of the pooled mean. Trait rows are unweighted",
-  "across studies; the SD column there is the across-study standard",
-  "deviation. Short-term outcomes have a ~1-year follow-up,",
-  "medium-term ~2 years, and long-term >~3 years.")
+build_outcomes_rows <- function() {
+  outcomes <- list(
+    list("emp",  "st", "Employment, short-term (%)",      1L),
+    list("emp",  "mt", "Employment, medium-term (%)",     1L),
+    list("emp",  "lt", "Employment, long-term (%)",       1L),
+    list("earn", "st", "Earnings, short-term (2025 $)",   0L),
+    list("earn", "mt", "Earnings, medium-term (2025 $)",  0L),
+    list("earn", "lt", "Earnings, long-term (2025 $)",    0L)
+  )
+  # Control-group means and impacts both use REML on the reported per-study
+  # impact SE: same weights study-by-study, just a different `yi`.
+  reml_section <- function(yi_suffix) {
+    function(oc) {
+      oc_type <- oc[[1]]; hz <- oc[[2]]; lab <- oc[[3]]; digits_oc <- oc[[4]]
+      y_col  <- paste0(hz, "_", oc_type, "_", yi_suffix)
+      se_col <- paste0(hz, "_", oc_type, "_se")
+      vals <- list(
+        ms_reml(dat[[y_col]][all_idx],     dat[[se_col]][all_idx],
+                dat$project[all_idx]),
+        ms_reml(dat[[y_col]][primary_idx], dat[[se_col]][primary_idx],
+                dat$project[primary_idx]))
+      list(values = fmt_row(lab, vals, digits = digits_oc), type = "coef")
+    }
+  }
+  rows <- list()
+  rows[[length(rows) + 1]] <- section_row("Control-group means")
+  for (oc in outcomes) rows[[length(rows) + 1]] <- reml_section("control_mean")(oc)
+  rows[[length(rows) + 1]] <- blank_row()
+  rows[[length(rows) + 1]] <- section_row("Impacts")
+  for (oc in outcomes) rows[[length(rows) + 1]] <- reml_section("impact")(oc)
+  rows
+}
 
-# RTF
-ft_desc_sw <- style_table(desc_obj_sw$df, desc_obj_sw$row_types,
-                          desc_caption_sw, desc_footer_sw)
-ft_desc_sw <- apply_desc_headers(ft_desc_sw)
-save_as_rtf(ft_desc_sw, path = "output/table_descriptives.rtf")
-cat("  RTF: output/table_descriptives.rtf\n")
+write_desc_table <- function(rows, basename, caption, footer) {
+  obj <- rows_to_df(rows)
+  ft <- style_table(obj$df, obj$row_types, caption, footer)
+  ft <- apply_desc_headers(ft)
+  rtf_path <- sprintf("output/%s.rtf", basename)
+  save_as_rtf(ft, path = rtf_path)
+  cat("  RTF: ", rtf_path, "\n", sep = "")
 
-# HTML
-ft_desc_sw_html <- style_table(desc_obj_sw$df, desc_obj_sw$row_types,
-                               desc_caption_sw, desc_footer_sw,
-                               fontname = "Source Serif 4")
-ft_desc_sw_html <- apply_desc_headers(ft_desc_sw_html)
-html_body_sw <- flextable:::gen_raw_html(ft_desc_sw_html)
-full_html_sw <- enc2utf8(paste0(
-  "<!DOCTYPE html>\n<html>\n<head><meta charset='UTF-8'>\n",
-  "<style>@import url('https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,200..900;1,8..60,200..900&display=swap');body{font-family:'Source Serif 4',serif;margin:20px;}table{border-collapse:collapse;}</style>\n",
-  "</head>\n<body>\n", html_body_sw, "\n",
-  iframe_resize_script, "\n</body>\n</html>\n"))
-writeBin(charToRaw(full_html_sw), "output/table_descriptives.html")
-cat("  HTML: output/table_descriptives.html\n")
+  ft_h <- style_table(obj$df, obj$row_types, caption, footer,
+                      fontname = "Source Serif 4")
+  ft_h <- apply_desc_headers(ft_h)
+  html_path <- sprintf("output/%s.html", basename)
+  html_body <- flextable:::gen_raw_html(ft_h)
+  full_html <- enc2utf8(paste0(
+    "<!DOCTYPE html>\n<html>\n<head><meta charset='UTF-8'>\n",
+    "<style>@import url('https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,200..900;1,8..60,200..900&display=swap');body{font-family:'Source Serif 4',serif;margin:20px;}table{border-collapse:collapse;}</style>\n",
+    "</head>\n<body>\n", html_body, "\n",
+    iframe_resize_script, "\n</body>\n</html>\n"))
+  writeBin(charToRaw(full_html), html_path)
+  cat("  HTML: ", html_path, "\n", sep = "")
+}
+
+write_desc_table(
+  build_traits_rows(),
+  basename = "table_descriptives",
+  caption  = "Sample characteristics by training-role subgroup",
+  footer   = paste(
+    "Notes: Trait rows are unweighted across studies; the SD column",
+    "is the across-study standard deviation."))
+
+write_desc_table(
+  build_outcomes_rows(),
+  basename = "table_outcomes",
+  caption  = "REML-pooled control-group means and impacts by training-role subgroup",
+  footer   = paste(
+    "Notes: Both panels use REML meta-analytic pooling on the reported",
+    "per-study impact standard errors — i.e. the control-mean panel uses",
+    "the same study weights as the impacts panel. The SD column is the",
+    "project-clustered (CR1) standard error of the pooled mean.",
+    "Short-term outcomes have a ~1-year follow-up,",
+    "medium-term ~2 years, and long-term >~3 years."))
 
 cat("\nAll tables written.\n")
