@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Meta-Regression Table Viewer</title>
+<title>Meta-regressions and survivor correlations</title>
 <style>
   body { font-family: "Segoe UI", Arial, sans-serif; margin: 20px; background: #fff; }
   h1 { font-family: "Styrene B", sans-serif; font-size: 1.4em; margin-bottom: 10px; }
@@ -92,6 +92,18 @@ window.addEventListener('message', (e) => {
   }
 });
 
+// Setting `iframe.src` adds a parent-page history entry per iframe per
+// radio click — pressing Back then walks back through old settings instead
+// of leaving the viewer. `contentWindow.location.replace(url)` swaps the
+// document without adding a history entry.
+function navigateFrame(frame, url) {
+  try {
+    frame.contentWindow.location.replace(url);
+  } catch (e) {
+    frame.src = url;
+  }
+}
+
 function update() {
   const oc = getRadio('outcome');
   const hz = getRadio('horizon');
@@ -107,9 +119,9 @@ function update() {
   pendingScrollY = window.scrollY;
   pendingResizes = new Set(['table', 'corr']);
 
-  frame.src = '../output/' + fn;
+  navigateFrame(frame, '../output/' + fn);
   label.textContent = fn;
-  corrFrame.src = '../output/' + corrFn;
+  navigateFrame(corrFrame, '../output/' + corrFn);
   corrLabel.textContent = corrFn;
 }
 document.querySelectorAll('input[type=radio]').forEach(r => r.addEventListener('change', update));
