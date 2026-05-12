@@ -1,5 +1,5 @@
 ## RCTs of job training in the U.S.
-This repo holds an in-progress meta-analysis of randomized evaluation of job training programs in the U.S., currently with 144 estimates from 56 studies.
+This is an in-progress meta-analysis of randomized evaluations of job training programs in the U.S., currently with 144 estimates from 56 studies.
 
 ### Selected exploratory outputs--best viewed through [Github Page](https://droodman.github.io/job-training-meta-analysis/)
 - [Descriptive statistics on setting, sample, intervention, etc.](output/table_descriptives.html)
