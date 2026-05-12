@@ -17,12 +17,16 @@ options(error = function() {
   if (!interactive()) quit(status = 1, save = "no")
 })
 
-library(readxl)
+library(openxlsx)
 
 # ── 1. Read data ─────────────────────────────────────────────────────────────
+#
+# Using openxlsx rather than readxl: readxl returns NA when a formula cell
+# has no cached value, which has bitten us before (e.g. JTPA Year-5
+# employment impacts entered as formulas with no cache).
 
-dat <- read_excel("data/extraction_full_v15.xlsx", sheet = "Data Table")
-reasoning <- read_excel("data/extraction_full_v15.xlsx", sheet = "Reasoning Table")
+dat <- read.xlsx("data/extraction_full_v17.xlsx", sheet = "Data Table")
+reasoning <- read.xlsx("data/extraction_full_v17.xlsx", sheet = "Reasoning Table")
 
 cat("Raw data:", nrow(dat), "rows x", ncol(dat), "cols\n")
 
