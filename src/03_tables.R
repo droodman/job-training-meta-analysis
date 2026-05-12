@@ -1287,10 +1287,16 @@ write_desc_table <- function(rows, basename, caption, footer) {
   ft_h <- apply_desc_headers(ft_h)
   html_path <- sprintf("output/%s.html", basename)
   html_body <- flextable:::gen_raw_html(ft_h)
+  # flextable's gen_raw_html drops the caption set by set_caption(); inject
+  # it as a heading above the table so the HTML version shows a title too.
+  esc <- function(s) gsub("<", "&lt;", gsub("&", "&amp;", s, fixed = TRUE), fixed = TRUE)
+  title_html <- sprintf(
+    "<h2 style='font-family:\"Source Serif 4\",serif;font-weight:600;font-size:1.15em;margin:0 0 10px 0;'>%s</h2>\n",
+    esc(caption))
   full_html <- enc2utf8(paste0(
     "<!DOCTYPE html>\n<html>\n<head><meta charset='UTF-8'>\n",
     "<style>@import url('https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,200..900;1,8..60,200..900&display=swap');body{font-family:'Source Serif 4',serif;margin:20px;}table{border-collapse:collapse;}</style>\n",
-    "</head>\n<body>\n", html_body, "\n",
+    "</head>\n<body>\n", title_html, html_body, "\n",
     iframe_resize_script, "\n</body>\n</html>\n"))
   writeBin(charToRaw(full_html), html_path)
   cat("  HTML: ", html_path, "\n", sep = "")
