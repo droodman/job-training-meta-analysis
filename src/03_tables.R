@@ -1299,21 +1299,15 @@ write_desc_table <- function(rows, basename, caption, footer) {
 write_desc_table(
   build_traits_rows(),
   basename = "table_descriptives",
-  caption  = "Sample characteristics by training-role subgroup",
+  caption  = "Study traits in U.S.-based job training experiments",
   footer   = paste(
-    "Notes: Trait rows are unweighted across studies; the SD column",
-    "is the across-study standard deviation."))
+    'Notes: Full sample is 144 estimates from 56 studies. Averages are unweighted. Sample sizes vary because of missing data. For multi-region experiments, “regional” unemployment is national.'))
 
 write_desc_table(
   build_outcomes_rows(),
   basename = "table_outcomes",
-  caption  = "REML-pooled control-group means and impacts by training-role subgroup",
+  caption  = "Control groups means and impact estimates in U.S.-based job training experiments",
   footer   = paste(
-    "Notes: Both panels use REML meta-analytic pooling on the reported",
-    "per-study impact standard errors — i.e. the control-mean panel uses",
-    "the same study weights as the impacts panel. The SD column is the",
-    "project-clustered (CR1) standard error of the pooled mean.",
-    "Short-term outcomes have a ~1-year follow-up,",
-    "medium-term ~2 years, and long-term >~3 years."))
+    'Notes: Impacts are estimated with random-effects maximum likelihood (REML) meta-analysis. Control-group statistics are com-puted using the corresponding REML weights. “SD/SE” columns hold standard deviations of control-group values and standard errors of impact estimates. Sample sizes vary because of missing data. Short-term outcomes have a ~1-year fol-low-up, medium-term ~2 years, and long-term >~3 years.'))
 
 cat("\nAll tables written.\n")
