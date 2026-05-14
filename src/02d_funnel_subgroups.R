@@ -129,7 +129,7 @@ outcome_types <- list(
 
 horizons <- c(st = "Short-term (~1-year)",
               mt = "Medium-term (~2-year)",
-              lt = "Long-term (>~3-year)")
+              lt = "Long-term (~3-5-year)")
 
 # Palette for up to 8 subgroup levels
 sg_palette <- c("#E41A1C", "#377EB8", "#4DAF4A", "#984EA3",

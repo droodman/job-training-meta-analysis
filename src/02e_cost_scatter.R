@@ -37,13 +37,13 @@ scatters <- list(
        outcome = "employment", horizon = "Medium-term (~2-year)",
        ylab = "Employment impact (percentage points)"),
   list(imp = "lt_emp_impact",  oc = "emp",  hz = "lt",
-       outcome = "employment", horizon = "Long-term (>~3-year)",
+       outcome = "employment", horizon = "Long-term (~3-5-year)",
        ylab = "Employment impact (percentage points)"),
   list(imp = "mt_earn_impact", oc = "earn", hz = "mt",
        outcome = "earnings",   horizon = "Medium-term (~2-year)",
        ylab = "Earnings impact (2025$, annualized)"),
   list(imp = "lt_earn_impact", oc = "earn", hz = "lt",
-       outcome = "earnings",   horizon = "Long-term (>~3-year)",
+       outcome = "earnings",   horizon = "Long-term (~3-5-year)",
        ylab = "Earnings impact (2025$, annualized)")
 )
 

@@ -741,7 +741,7 @@ survivor_panel_cache <- list()
 
 for (sm in samples) {
   for (hz in c("st", "mt", "lt")) {
-    hz_label <- c(st = "Short-term (~1-year)", mt = "Medium-term (~2-year)", lt = "Long-term (>~3-year)")[hz]
+    hz_label <- c(st = "Short-term (~1-year)", mt = "Medium-term (~2-year)", lt = "Long-term (~3-5-year)")[hz]
 
     for (approach in c("cc", "mi")) {
       app_label <- if (approach == "cc") "Complete Case" else sprintf("Multiple Imputation (m = %d)", m_imp)
@@ -1314,6 +1314,6 @@ write_desc_table(
   basename = "table_outcomes",
   caption  = "Control groups means and impact estimates in U.S.-based job training experiments",
   footer   = paste(
-    'Notes: Impacts are estimated with random-effects maximum likelihood (REML) meta-analysis. Control-group statistics are com-puted using the corresponding REML weights. “SD/SE” columns hold standard deviations of control-group values and standard errors of impact estimates. Sample sizes vary because of missing data. Short-term outcomes have a ~1-year fol-low-up, medium-term ~2 years, and long-term >~3 years.'))
+    'Notes: Impacts are estimated with random-effects maximum likelihood (REML) meta-analysis. Control-group statistics are com-puted using the corresponding REML weights. “SD/SE” columns hold standard deviations of control-group values and standard errors of impact estimates. Sample sizes vary because of missing data. Short-term outcomes have a ~1-year fol-low-up, medium-term ~2 years, and long-term ~3-5 years.'))
 
 cat("\nAll tables written.\n")
