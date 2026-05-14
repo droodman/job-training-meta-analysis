@@ -166,8 +166,8 @@ for (outcome in c("program_uptake", "any_training")) {
 
 # ── 3. Impute earnings SEs from significance stars ───────────────────────────
 #
-# Smedslund et al. 2006 (Campbell), p. 25:
-#   Not significant → p = 0.10
+# Greenberg, Michalopoulos, and Robins (2006), note 9:
+#   Not significant → p = 0.55
 #   * (p < 0.10)   → p = 0.075
 #   ** (p < 0.05)  → p = 0.03
 #   *** (p < 0.01) → p = 0.01
@@ -178,7 +178,7 @@ for (outcome in c("program_uptake", "any_training")) {
 #       which is nonsensical. We flag these cases.
 
 stars_to_p <- function(stars) {
-  ifelse(is.na(stars) | stars == "",  0.10,
+  ifelse(is.na(stars) | stars == "",  0.55,
   ifelse(stars == "*",                0.075,
   ifelse(stars == "**",              0.03,
   ifelse(stars == "***",             0.01, NA_real_))))
