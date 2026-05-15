@@ -76,6 +76,11 @@ make_scatter <- function(dat, sp, sm) {
   abline(h = 0, lty = 3, col = "grey50")
   fit <- lm(y ~ x)
   abline(fit, col = "firebrick", lwd = 1.5)
+  slope <- coef(fit)[["x"]]
+  slope_se <- sqrt(diag(vcov(fit)))[["x"]]
+  legend("topright",
+         legend = sprintf("Slope = %.3g (SE %.2g)", slope, slope_se),
+         lty = 1, lwd = 1.5, col = "firebrick", bty = "n", cex = 1.05)
 
   cat(sprintf("Saved %s (k=%d)\n", filename, length(idx)))
 }
@@ -137,9 +142,19 @@ make_benefit_cost_scatter <- function(dat, labeled) {
          pos = 4, cex = 1.15, offset = 0.7, col = "grey25")
   }
 
+  fit <- lm(y ~ x)
+  abline(fit, col = "firebrick", lwd = 1.5)
+  slope <- coef(fit)[["x"]]
+  slope_se <- sqrt(diag(vcov(fit)))[["x"]]
+
   legend("topleft",
-         legend = c("Training is primary", "Training is secondary"),
-         pch = c(19, 1), pt.lwd = 2, col = "steelblue4", bty = "n", cex = 1.15)
+         legend = c("Training is primary", "Training is secondary",
+                    sprintf("Slope = %.2f (SE %.2f)", slope, slope_se)),
+         pch    = c(19, 1, NA),
+         lty    = c(NA, NA, 1),
+         lwd    = c(2, 2, 1.5),
+         col    = c("steelblue4", "steelblue4", "firebrick"),
+         bty = "n", cex = 1.15)
 
   cat(sprintf("Saved %s (k=%d, %d labelled)\n",
               filename, length(idx), sum(to_label)))
