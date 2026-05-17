@@ -85,6 +85,11 @@ dat$employengage_curricula_label <- factor(
   levels = c("Employers engaged in curriculum design",
              "Employers not engaged in curriculum design"))
 
+dat$cost_info_label <- factor(
+  ifelse(!is.na(dat$cost_per_treated),
+         "Cost info available", "Cost info missing"),
+  levels = c("Cost info available", "Cost info missing"))
+
 # ── 2. Definitions ───────────────────────────────────────────────────────────
 
 subgroups <- list(
@@ -120,6 +125,9 @@ subgroups <- list(
   list(var = "employengage_curricula_label",
        label = "by employer engagement in curriculum design",
        file_suffix = "employengage"),
+  list(var = "cost_info_label",
+       label = "by cost info availability",
+       file_suffix = "costinfo"),
   list(var = ".resprate", label = "by outcome response rate",
        file_suffix = "resprate")
 )
