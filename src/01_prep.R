@@ -25,8 +25,8 @@ library(openxlsx)
 # has no cached value, which has bitten us before (e.g. JTPA Year-5
 # employment impacts entered as formulas with no cache).
 
-dat <- read.xlsx("data/extraction_full_v18.xlsx", sheet = "Data Table")
-reasoning <- read.xlsx("data/extraction_full_v18.xlsx", sheet = "Reasoning Table")
+dat <- read.xlsx("data/extraction_full_v19.xlsx", sheet = "Data Table")
+reasoning <- read.xlsx("data/extraction_full_v19.xlsx", sheet = "Reasoning Table")
 
 # openxlsx does not auto-decode XML/HTML entities — strings like "PACE &#8211;
 # Year Up" or "GAIN Education &amp; Training" arrive with the entity literals
@@ -444,6 +444,38 @@ for (prefix in c("st", "mt", "lt")) {
   n_missing  <- sum(!is.na(dat[[imp_col]]) & is.na(dat[[infl_col]]))
   cat(sprintf("%s earnings: %d inflation-adjusted to 2025$, %d missing dollar-year\n",
               toupper(prefix), n_adjusted, n_missing))
+}
+
+# Rescale cost_per_treated and benefit_per_treated to a per-T-assignee basis
+# for rows whose source reports them per person actually enrolled in training.
+# per_assigned = per_enrolled * (uptake_T / 100), where uptake_T is the
+# percentage of the treatment group that took up training =
+# program_uptake_control_mean + program_uptake_impact. Uptake columns are
+# stored in percentage points (0-100), so divide by 100 to get a fraction.
+rescale_to_assigned <- !is.na(dat$cost_denominator) &
+  dat$cost_denominator == "T-enrolled"
+rescale_missing <- rescale_to_assigned &
+  (is.na(dat$program_uptake_impact) | is.na(dat$program_uptake_control_mean))
+if (any(rescale_missing)) {
+  warning("T-enrolled rows missing uptake data: ",
+          paste(unique(dat$project[rescale_missing]), collapse = "; "))
+}
+rescale_to_assigned <- rescale_to_assigned & !rescale_missing
+uptake_t_frac <- (dat$program_uptake_control_mean +
+                  dat$program_uptake_impact) / 100
+
+cost_mask <- rescale_to_assigned & !is.na(dat$cost_per_treated)
+dat$cost_per_treated[cost_mask] <-
+  dat$cost_per_treated[cost_mask] * uptake_t_frac[cost_mask]
+cat(sprintf("Cost: %d T-enrolled rows rescaled to per-T-assignee basis\n",
+            sum(cost_mask)))
+
+if ("benefit_per_treated" %in% names(dat)) {
+  ben_mask <- rescale_to_assigned & !is.na(dat$benefit_per_treated)
+  dat$benefit_per_treated[ben_mask] <-
+    dat$benefit_per_treated[ben_mask] * uptake_t_frac[ben_mask]
+  cat(sprintf("Benefit: %d T-enrolled rows rescaled to per-T-assignee basis\n",
+              sum(ben_mask)))
 }
 
 # Cost: assume incurred at the randomization midpoint
