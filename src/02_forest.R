@@ -110,7 +110,7 @@ make_forest <- function(dat, prefix, horizon_label, oc, so, sample_suffix) {
   do.call(forest, forest_args)
 
   # Overdraw study markers and CI lines in grey so they contrast with the
-  # steelblue4 RE row at the bottom — without recoloring the text labels
+  # steelblue1 RE row at the bottom — without recoloring the text labels
   # (forest()'s `col`/`colout` can tint annotation text in some metafor
   # builds, so leave them default and just paint over the marks).
   study_rows <- seq(n + 1, 2)
@@ -123,12 +123,12 @@ make_forest <- function(dat, prefix, horizon_label, oc, so, sample_suffix) {
   # plots in 02g): keep addpoly for label/number formatting but suppress
   # the diamond (efac = 0, border = NA), then overlay segments and a dot.
   addpoly(res_re, row = 0, cex = 1.05, digits = oc$dig, efac = 0,
-          col = "steelblue4", border = NA,
+          col = "steelblue1", border = NA,
           fonts = c("Source Serif 4", "Source Serif 4"),
           mlab = sprintf("RE Model (I\u00b2 = %.1f%%, \u03c4\u00b2 = %.2f)",
                          res_re$I2, res_re$tau2))
-  segments(res_re$ci.lb, 0, res_re$ci.ub, 0, col = "steelblue4", lwd = 1.4)
-  points(coef(res_re), 0, pch = 19, col = "steelblue4", cex = 1.5)
+  segments(res_re$ci.lb, 0, res_re$ci.ub, 0, col = "steelblue1", lwd = 1.4)
+  points(coef(res_re), 0, pch = 19, col = "steelblue1", cex = 1.5)
 
   cat(sprintf("Saved %s\n", filename))
 }

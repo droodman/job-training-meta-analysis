@@ -271,7 +271,7 @@ make_subgroup_forest <- function(dat, prefix, horizon_label, sg_var, sg_label,
   do.call(forest, forest_args)
 
   # Overdraw study markers and CI lines in grey for visual contrast with
-  # the steelblue4 subgroup-RE rows below — text labels stay default color.
+  # the steelblue1 subgroup-RE rows below — text labels stay default color.
   study_rows <- unlist(rows_list)
   qval <- qnorm(0.975)
   segments(yi - qval * sei, study_rows, yi + qval * sei, study_rows,
@@ -298,14 +298,14 @@ make_subgroup_forest <- function(dat, prefix, horizon_label, sg_var, sg_label,
       # Dot+whisker rendering to match summary forest plots in 02g:
       # suppress addpoly's diamond and overlay segments/points.
       addpoly(fit_re, row = re_diamond_rows[i], cex = 1.05, digits = oc$dig,
-              efac = 0, col = "steelblue4", border = NA,
+              efac = 0, col = "steelblue1", border = NA,
               fonts = c("Source Serif 4", "Source Serif 4"),
               mlab = sprintf("RE: %s (k=%d, I\u00b2=%.0f%%)",
                              g, length(g_idx), fit_re$I2))
       segments(fit_re$ci.lb, re_diamond_rows[i], fit_re$ci.ub, re_diamond_rows[i],
-               col = "steelblue4", lwd = 1.4)
+               col = "steelblue1", lwd = 1.4)
       points(coef(fit_re), re_diamond_rows[i], pch = 19,
-             col = "steelblue4", cex = 1.5)
+             col = "steelblue1", cex = 1.5)
     }
   }
 

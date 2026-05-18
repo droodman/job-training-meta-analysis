@@ -67,7 +67,7 @@ make_scatter <- function(dat, sp, sm) {
   par(mar = c(4.2, 4.5, 2.5, 1), family = "Source Serif 4")
 
   plot(x, y,
-       pch = 19, col = "steelblue4",
+       pch = 19, col = "steelblue1",
        xlab = "Cost per treated (2025$, thousands)",
        ylab = sp$ylab,
        main = sprintf("%s %s impact vs cost — %s (k=%d)",
@@ -131,7 +131,7 @@ make_benefit_cost_scatter <- function(dat, labeled) {
 
   plot(x, y,
        pch = ifelse(primary, 19, 1),
-       col = "steelblue4",
+       col = "steelblue1",
        xlab = "Cost per treated (2025$, thousands)",
        ylab = "Benefit per treated (2025$, thousands)",
        xlim = c(0, 55),
@@ -153,7 +153,7 @@ make_benefit_cost_scatter <- function(dat, labeled) {
          pch    = c(19, 1, NA),
          lty    = c(NA, NA, 1),
          lwd    = c(2, 2, 1.5),
-         col    = c("steelblue4", "steelblue4", "firebrick"),
+         col    = c("steelblue1", "steelblue1", "firebrick"),
          bty = "n", cex = 1.15)
 
   cat(sprintf("Saved %s (k=%d, %d labelled)\n",

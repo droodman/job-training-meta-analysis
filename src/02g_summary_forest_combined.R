@@ -198,7 +198,7 @@ compute_estimates <- function(layout_rows, sample_idx = seq_len(nrow(dat))) {
 }
 
 draw_point <- function(x, ci.lb, ci.ub, y,
-                       color = "steelblue4", cex = 0.9) {
+                       color = "steelblue1", cex = 0.9) {
   segments(ci.lb, y, ci.ub, y, col = color, lwd = 1.4)
   points(x, y, pch = 19, col = color, cex = cex)
 }
