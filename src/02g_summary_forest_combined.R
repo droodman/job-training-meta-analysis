@@ -88,6 +88,10 @@ for (col in grep("^resprate_label_(emp|earn)_(st|mt|lt)$",
   dat[[col]] <- factor(v, levels = c("<80%", ">80%"))
 }
 
+dat$cost_info_label <- factor(
+  ifelse(!is.na(dat$cost_per_treated), "Available", "Missing"),
+  levels = c("Available", "Missing"))
+
 # ── 2. Subgroup specs (same order as 02f) ────────────────────────────────────
 
 subgroups <- list(
@@ -105,7 +109,8 @@ subgroups <- list(
   list(var = "funding_label",                label = "Funding source"),
   list(var = "data_source_label",            label = "Outcome data source"),
   list(var = ".resprate",                    label = "Response rate"),
-  list(var = "academic_label",               label = "Academically published")
+  list(var = "academic_label",               label = "Academically published"),
+  list(var = "cost_info_label",              label = "Cost info")
 )
 
 # ── 3. REML pooler ───────────────────────────────────────────────────────────

@@ -25,8 +25,42 @@ library(openxlsx)
 # has no cached value, which has bitten us before (e.g. JTPA Year-5
 # employment impacts entered as formulas with no cache).
 
-dat <- read.xlsx("data/extraction_full_v17.xlsx", sheet = "Data Table")
-reasoning <- read.xlsx("data/extraction_full_v17.xlsx", sheet = "Reasoning Table")
+dat <- read.xlsx("data/extraction_full_v18.xlsx", sheet = "Data Table")
+reasoning <- read.xlsx("data/extraction_full_v18.xlsx", sheet = "Reasoning Table")
+
+# openxlsx does not auto-decode XML/HTML entities — strings like "PACE &#8211;
+# Year Up" or "GAIN Education &amp; Training" arrive with the entity literals
+# intact, which then fail to match project lists below. Decode here.
+decode_html_entities <- function(x) {
+  if (!is.character(x)) return(x)
+  # Numeric decimal references: &#NNNN;
+  matches <- regmatches(x, gregexpr("&#\\d+;", x))
+  for (i in seq_along(x)) {
+    if (length(matches[[i]]) == 0) next
+    for (ent in unique(matches[[i]])) {
+      num <- as.integer(sub("&#(\\d+);", "\\1", ent))
+      x[i] <- gsub(ent, intToUtf8(num), x[i], fixed = TRUE)
+    }
+  }
+  # Hex references: &#xHHHH;
+  matches <- regmatches(x, gregexpr("&#x[0-9A-Fa-f]+;", x))
+  for (i in seq_along(x)) {
+    if (length(matches[[i]]) == 0) next
+    for (ent in unique(matches[[i]])) {
+      num <- strtoi(sub("&#x([0-9A-Fa-f]+);", "\\1", ent), base = 16)
+      x[i] <- gsub(ent, intToUtf8(num), x[i], fixed = TRUE)
+    }
+  }
+  # Named entities — decode &amp; LAST so "&amp;lt;" stays as "&lt;"
+  x <- gsub("&lt;",   "<",  x, fixed = TRUE)
+  x <- gsub("&gt;",   ">",  x, fixed = TRUE)
+  x <- gsub("&quot;", "\"", x, fixed = TRUE)
+  x <- gsub("&apos;", "'",  x, fixed = TRUE)
+  x <- gsub("&amp;",  "&",  x, fixed = TRUE)
+  x
+}
+dat       <- as.data.frame(lapply(dat,       decode_html_entities), stringsAsFactors = FALSE)
+reasoning <- as.data.frame(lapply(reasoning, decode_html_entities), stringsAsFactors = FALSE)
 
 cat("Raw data:", nrow(dat), "rows x", ncol(dat), "cols\n")
 
@@ -132,8 +166,8 @@ for (outcome in c("program_uptake", "any_training")) {
 
 # ── 3. Impute earnings SEs from significance stars ───────────────────────────
 #
-# Smedslund et al. 2006 (Campbell), p. 25:
-#   Not significant → p = 0.10
+# Greenberg, Michalopoulos, and Robins (2006), note 9:
+#   Not significant → p = 0.55
 #   * (p < 0.10)   → p = 0.075
 #   ** (p < 0.05)  → p = 0.03
 #   *** (p < 0.01) → p = 0.01
@@ -144,7 +178,7 @@ for (outcome in c("program_uptake", "any_training")) {
 #       which is nonsensical. We flag these cases.
 
 stars_to_p <- function(stars) {
-  ifelse(is.na(stars) | stars == "",  0.10,
+  ifelse(is.na(stars) | stars == "",  0.55,
   ifelse(stars == "*",                0.075,
   ifelse(stars == "**",              0.03,
   ifelse(stars == "***",             0.01, NA_real_))))

@@ -22,7 +22,7 @@ outcome_types <- list(
 
 horizons <- c(st = "Short-term (~1-year)",
               mt = "Medium-term (~2-year)",
-              lt = "Long-term (>~3-year)")
+              lt = "Long-term (~3-5-year)")
 
 make_funnel <- function(dat, prefix, horizon_label, oc, sample_suffix) {
   imp_col <- paste0(prefix, oc$imp_suffix)

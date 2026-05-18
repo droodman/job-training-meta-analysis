@@ -22,7 +22,7 @@ if (!exists(".fmtx_patched", envir = .GlobalEnv)) {
 dat <- readRDS("data/processed_data.rds")
 dir.create("output", showWarnings = FALSE)
 
-horizons <- c(st = "Short-term (~1-year)", mt = "Medium-term (~2-year)", lt = "Long-term (>~3-year)")
+horizons <- c(st = "Short-term (~1-year)", mt = "Medium-term (~2-year)", lt = "Long-term (~3-5-year)")
 
 outcome_types <- list(
   list(name = "emp",  imp_suffix = "_emp_impact",  se_suffix = "_emp_se",
