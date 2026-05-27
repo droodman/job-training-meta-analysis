@@ -1067,29 +1067,25 @@ desc_row_defs <- list(
 
 # Override style_table's default header (which expects 8 columns and labels
 # the last "Survivors") with the three subsample labels.
-apply_desc_headers <- function(ft) {
-  # Sub-header row: Mean / SE / N for each sample group.
-  ft <- set_header_labels(ft, values = list(
-    variable     = "",
-    primary_mean = "Mean",
-    primary_se   = "SD",
-    primary_n    = "N",
-    all_mean     = "Mean",
-    all_se       = "SD",
-    all_n        = "N"))
-  # Super-header row: "All" / "Training primary" each spanning 3 columns.
+apply_desc_headers <- function(ft, groups) {
+  ids   <- col_ids_for(groups)
+  jdata <- 2:(length(ids) + 1L)             # data columns (3 per group)
+  # Sub-header row: Mean / SD / N for each sample group.
+  sub <- setNames(as.list(rep(c("Mean", "SD", "N"), length(groups))), ids)
+  ft <- set_header_labels(ft, values = c(list(variable = ""), sub))
+  # Super-header row: one spanning label per group, each over 3 columns.
   ft <- add_header_row(ft,
-    values    = c("", "Experiments incorporating training", "Those with training primary"),
-    colwidths = c(1, 3, 3),
+    values    = c("", vapply(groups, `[[`, "", "header")),
+    colwidths = c(1, rep(3, length(groups))),
     top       = TRUE)
-  ft <- bold(ft, j = 2:7, part = "header")
-  ft <- align(ft, j = 2:7, align = "center", part = "header")
+  ft <- bold(ft, j = jdata, part = "header")
+  ft <- align(ft, j = jdata, align = "center", part = "header")
   # ~2 chars wider than style_table's default 2.6" label column.
   ft <- width(ft, j = 1, width = 2.8)
-  ft <- width(ft, j = 2:7, width = 0.68)
+  ft <- width(ft, j = jdata, width = 0.68)
   # Thin rule under the super-header to separate it from sub-headers.
   thin_rule <- fp_border(color = "black", width = 0.5)
-  ft <- hline(ft, i = 1, j = 2:7, part = "header", border = thin_rule)
+  ft <- hline(ft, i = 1, j = jdata, part = "header", border = thin_rule)
   # Tighten the gap between the bottom rule and the notes.
   ft <- padding(ft, padding.top = 1, part = "footer")
   ft
@@ -1187,9 +1183,34 @@ descriptive_sw_value <- function(varname, subset_idx) {
 }
 
 primary_idx <- which(!is.na(dat$training_role) & dat$training_role == "primary")
+sector_idx  <- which(!is.na(dat$sector_program) & dat$sector_program == 1)
 all_idx     <- seq_len(nrow(dat))
-desc_col_ids <- c("all_mean",     "all_se",     "all_n",
-                  "primary_mean", "primary_se", "primary_n")
+
+# Column groups per table. Each group is one Mean/SD/N triplet: `prefix` keys
+# the column ids, `header` is the spanning super-header, `idx` selects rows.
+# The descriptives table carries a sector-program triplet (all sector programs,
+# regardless of training role); the outcomes table keeps the original two.
+desc_groups_traits <- list(
+  list(prefix = "all",     header = "Experiments incorporating training",
+       idx = all_idx),
+  list(prefix = "primary", header = "Those with training primary",
+       idx = primary_idx),
+  list(prefix = "sector",  header = "Sector programs",
+       idx = sector_idx)
+)
+desc_groups_outcomes <- list(
+  list(prefix = "all",     header = "Experiments incorporating training",
+       idx = all_idx),
+  list(prefix = "primary", header = "Those with training primary",
+       idx = primary_idx)
+)
+col_ids_for <- function(groups)
+  unlist(lapply(groups, function(g)
+    paste0(g$prefix, c("_mean", "_se", "_n"))))
+
+# fmt_row / blank_row / section_row read this global; set it to match the
+# table being built before its rows are constructed.
+desc_col_ids <- col_ids_for(desc_groups_traits)
 
 fmt_v_cells <- function(stats, digits = 2, big_mark = "") {
   if (is.na(stats[["mean"]])) return(c("–", "", ""))
@@ -1205,9 +1226,9 @@ fmt_v_cells <- function(stats, digits = 2, big_mark = "") {
 fmt_row <- function(label, vals, digits = 2) {
   big_mark <- if (grepl("\\$|sample size", label, ignore.case = TRUE)) ","
               else ""
-  out <- c(sprintf("  %s", label),
-           fmt_v_cells(vals[[1]], digits, big_mark),
-           fmt_v_cells(vals[[2]], digits, big_mark))
+  cells <- unlist(lapply(vals, fmt_v_cells, digits = digits,
+                         big_mark = big_mark))
+  out <- c(sprintf("  %s", label), cells)
   names(out) <- c("variable", desc_col_ids)
   out
 }
@@ -1229,8 +1250,8 @@ build_traits_rows <- function() {
     if (i > 1) rows[[length(rows) + 1]] <- blank_row()
     rows[[length(rows) + 1]] <- section_row(rd$section)
     for (varname in names(rd$vars)) {
-      vals <- list(descriptive_value(varname, all_idx),
-                   descriptive_value(varname, primary_idx))
+      vals <- lapply(desc_groups_traits,
+                     function(g) descriptive_value(varname, g$idx))
       digits_t <- if (varname %in% c("treatment_duration_months",
                                      "UNRATE_PLACEHOLDER")) 1L else 0L
       rows[[length(rows) + 1]] <- list(
@@ -1257,11 +1278,9 @@ build_outcomes_rows <- function() {
       oc_type <- oc[[1]]; hz <- oc[[2]]; lab <- oc[[3]]; digits_oc <- oc[[4]]
       y_col  <- paste0(hz, "_", oc_type, "_", yi_suffix)
       se_col <- paste0(hz, "_", oc_type, "_se")
-      vals <- list(
-        ms_reml(dat[[y_col]][all_idx],     dat[[se_col]][all_idx],
-                dat$project[all_idx]),
-        ms_reml(dat[[y_col]][primary_idx], dat[[se_col]][primary_idx],
-                dat$project[primary_idx]))
+      vals <- lapply(desc_groups_outcomes, function(g)
+        ms_reml(dat[[y_col]][g$idx], dat[[se_col]][g$idx],
+                dat$project[g$idx]))
       list(values = fmt_row(lab, vals, digits = digits_oc), type = "coef")
     }
   }
@@ -1274,17 +1293,17 @@ build_outcomes_rows <- function() {
   rows
 }
 
-write_desc_table <- function(rows, basename, caption, footer) {
+write_desc_table <- function(rows, groups, basename, caption, footer) {
   obj <- rows_to_df(rows)
   ft <- style_table(obj$df, obj$row_types, caption, footer)
-  ft <- apply_desc_headers(ft)
+  ft <- apply_desc_headers(ft, groups)
   rtf_path <- sprintf("output/%s.rtf", basename)
   save_as_rtf(ft, path = rtf_path)
   cat("  RTF: ", rtf_path, "\n", sep = "")
 
   ft_h <- style_table(obj$df, obj$row_types, caption, footer,
                       fontname = "Source Serif 4")
-  ft_h <- apply_desc_headers(ft_h)
+  ft_h <- apply_desc_headers(ft_h, groups)
   html_path <- sprintf("output/%s.html", basename)
   html_body <- flextable:::gen_raw_html(ft_h)
   # flextable's gen_raw_html drops the caption set by set_caption(); inject
@@ -1302,15 +1321,17 @@ write_desc_table <- function(rows, basename, caption, footer) {
   cat("  HTML: ", html_path, "\n", sep = "")
 }
 
+desc_col_ids <- col_ids_for(desc_groups_traits)
 write_desc_table(
-  build_traits_rows(),
+  build_traits_rows(), desc_groups_traits,
   basename = "table_descriptives",
   caption  = "Study traits in U.S.-based job training experiments",
   footer   = paste(
     'Notes: Full sample is 144 estimates from 56 studies. Averages are unweighted. Sample sizes vary because of missing data. For multi-region experiments, “regional” unemployment is national.'))
 
+desc_col_ids <- col_ids_for(desc_groups_outcomes)
 write_desc_table(
-  build_outcomes_rows(),
+  build_outcomes_rows(), desc_groups_outcomes,
   basename = "table_outcomes",
   caption  = "Control groups means and impact estimates in U.S.-based job training experiments",
   footer   = paste(

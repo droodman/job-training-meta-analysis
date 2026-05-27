@@ -22,11 +22,10 @@ library(openxlsx)
 # ── 1. Read data ─────────────────────────────────────────────────────────────
 #
 # Using openxlsx rather than readxl: readxl returns NA when a formula cell
-# has no cached value, which has bitten us before (e.g. JTPA Year-5
-# employment impacts entered as formulas with no cache).
+# has no cached value, which has bitten us before.
 
-dat <- read.xlsx("data/extraction_full_v19.xlsx", sheet = "Data Table")
-reasoning <- read.xlsx("data/extraction_full_v19.xlsx", sheet = "Reasoning Table")
+dat <- read.xlsx("data/extraction_full_v35.xlsx", sheet = "Data Table")
+reasoning <- read.xlsx("data/extraction_full_v35.xlsx", sheet = "Reasoning Table")
 
 # openxlsx does not auto-decode XML/HTML entities — strings like "PACE &#8211;
 # Year Up" or "GAIN Education &amp; Training" arrive with the entity literals
@@ -445,6 +444,31 @@ for (prefix in c("st", "mt", "lt")) {
   cat(sprintf("%s earnings: %d inflation-adjusted to 2025$, %d missing dollar-year\n",
               toupper(prefix), n_adjusted, n_missing))
 }
+
+# ── 5b. Total measured earnings impact across populated horizons (2025$) ─────
+#
+# Sum the originally measured earnings impacts across whichever of st/mt/lt
+# are populated, all expressed in 2025 dollars. Each horizon's contribution
+# undoes the annualization in §4 so we recover the cumulative dollar impact
+# over the window the source actually reports:
+#   per-horizon total = annualized_impact / annual_multiplier
+#                     = original_impact × cpi_factor
+# Rows with no earnings impact at any horizon remain NA.
+
+per_horizon_totals <- sapply(c("st", "mt", "lt"), function(prefix) {
+  imp_col  <- paste0(prefix, "_earn_impact")
+  mult_col <- paste0(prefix, "_earn_annual_multiplier")
+  dat[[imp_col]] / dat[[mult_col]]
+})
+any_imp <- rowSums(!is.na(per_horizon_totals)) > 0
+dat$measured_earn_impact <- ifelse(
+  any_imp,
+  rowSums(per_horizon_totals, na.rm = TRUE),
+  NA_real_
+)
+
+cat(sprintf("Measured earnings impact (2025$, summed across populated horizons): %d rows non-NA\n",
+            sum(!is.na(dat$measured_earn_impact))))
 
 # Rescale cost_per_treated and benefit_per_treated to a per-T-assignee basis
 # for rows whose source reports them per person actually enrolled in training.

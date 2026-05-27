@@ -15,6 +15,9 @@ options(error = function() {
 cat("====== 01_prep.R ======\n")
 source("src/01_prep.R")
 
+cat("\n====== 01b_prep_estimates.R ======\n")
+source("src/01b_prep_estimates.R")
+
 cat("\n====== 02_forest.R ======\n")
 source("src/02_forest.R")
 
@@ -29,6 +32,9 @@ source("src/02d_funnel_subgroups.R")
 
 cat("\n====== 02e_cost_scatter.R ======\n")
 source("src/02e_cost_scatter.R")
+
+cat("\n====== 02f_estimates_scatter.R ======\n")
+source("src/02f_estimates_scatter.R")
 
 cat("\n====== 03_tables.R ======\n")
 source("src/03_tables.R")

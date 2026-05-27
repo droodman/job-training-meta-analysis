@@ -270,9 +270,15 @@ make_subgroup_forest <- function(dat, prefix, horizon_label, sg_var, sg_label,
   if (!is.null(oc$xlim)) forest_args$xlim <- oc$xlim
   do.call(forest, forest_args)
 
+  study_rows <- unlist(rows_list)
+  # Light dotted leader rules through each study row and each subgroup-RE row
+  # (not the group-header rows) so the eye can scan label → CI → estimate.
+  # Drawn before the grey overdraw so the whisker/marker sit on top.
+  abline(h = c(study_rows, re_diamond_rows),
+         lty = "dotted", col = "grey85", lwd = 0.6)
+
   # Overdraw study markers and CI lines in grey for visual contrast with
   # the steelblue1 subgroup-RE rows below — text labels stay default color.
-  study_rows <- unlist(rows_list)
   qval <- qnorm(0.975)
   segments(yi - qval * sei, study_rows, yi + qval * sei, study_rows,
            col = "grey50", lwd = 1.4)

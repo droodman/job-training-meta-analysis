@@ -109,11 +109,16 @@ make_forest <- function(dat, prefix, horizon_label, oc, so, sample_suffix) {
   if (!is.null(oc$xlim)) forest_args$xlim <- oc$xlim
   do.call(forest, forest_args)
 
+  study_rows <- seq(n + 1, 2)
+  # Light dotted leader rules through each row (study rows + RE summary at 0)
+  # so the eye can scan label → CI → estimate text. Drawn before the grey
+  # overdraw so the whisker/marker sit on top.
+  abline(h = c(study_rows, 0), lty = "dotted", col = "grey85", lwd = 0.6)
+
   # Overdraw study markers and CI lines in grey so they contrast with the
   # steelblue1 RE row at the bottom — without recoloring the text labels
   # (forest()'s `col`/`colout` can tint annotation text in some metafor
   # builds, so leave them default and just paint over the marks).
-  study_rows <- seq(n + 1, 2)
   qval <- qnorm(0.975)
   segments(yi - qval * sei, study_rows, yi + qval * sei, study_rows,
            col = "grey50", lwd = 1.4)

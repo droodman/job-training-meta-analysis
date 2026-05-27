@@ -103,8 +103,6 @@ labeled_short_names <- c(
   "NSWD-School dropouts",
   "JTPA-Adult women",
   "JTPA-Adult men",
-  "JTPA-Female youths",
-  "JTPA-Male youths",
   "Year Up",
   "Per Scholas",
   "St. Nicks",
@@ -113,7 +111,9 @@ labeled_short_names <- c(
   "QUEST",
   "WIA-Adult",
   "WIA-Dislocated",
-  "Job Corps"
+  "Job Corps",
+  "CET",
+  "ACE"
 )
 
 make_benefit_cost_scatter <- function(dat, labeled) {
@@ -161,5 +161,53 @@ make_benefit_cost_scatter <- function(dat, labeled) {
 }
 
 make_benefit_cost_scatter(dat, labeled_short_names)
+
+# ── Measured earnings impact vs cost scatter ─────────────────────────────────
+# measured_earn_impact is the total observed earnings impact in 2025$, summed
+# across whichever follow-up horizons (st/mt/lt) the source populated. Unlike
+# benefit_per_treated, it is the raw observed impact rather than a discounted
+# / extrapolated cost-benefit accounting figure.
+
+make_measured_cost_scatter <- function(dat, labeled) {
+  idx <- which(!is.na(dat$cost_per_treated) & !is.na(dat$measured_earn_impact))
+  d <- dat[idx, ]
+  x <- d$cost_per_treated / 1000          # 2025$ thousands
+  y <- d$measured_earn_impact / 1000      # 2025$ thousands
+  primary <- !is.na(d$training_role) & d$training_role == "primary"
+
+  filename <- "output/scatter_measured_earn_cost.png"
+  png(filename, width = 10, height = 7, units = "in", res = 150)
+  on.exit(dev.off())
+  showtext_opts(dpi = 150)
+  par(mar = c(4.2, 4.5, 2.5, 1), family = "LM Roman 10", las = 1)
+
+  plot(x, y,
+       pch = ifelse(primary, 19, 1),
+       col = "steelblue1",
+       xlab = "Cost per treated (2025$, thousands)",
+       ylab = "Measured earnings impact (2025$, thousands)",
+       xlim = c(0, 50),
+       cex = 1.3, cex.lab = 1.15, cex.axis = 1.15, lwd = 2, bty = "l")
+  abline(h = 0, lty = 3, col = "grey50")
+  abline(a = 0, b = 1, lty = 2, col = "grey40", lwd = 1.2)
+  to_label <- !is.na(d$short_name) & d$short_name %in% labeled
+  if (any(to_label)) {
+    text(x[to_label], y[to_label], labels = d$short_name[to_label],
+         pos = 4, cex = 1.15, offset = 0.7, col = "grey25")
+  }
+
+  legend("topleft",
+         legend = c("Training is primary", "Training is secondary", "y = x"),
+         pch    = c(19, 1, NA),
+         lty    = c(NA, NA, 2),
+         lwd    = c(2, 2, 1.2),
+         col    = c("steelblue1", "steelblue1", "grey40"),
+         bty = "n", cex = 1.15)
+
+  cat(sprintf("Saved %s (k=%d, %d labelled)\n",
+              filename, length(idx), sum(to_label)))
+}
+
+make_measured_cost_scatter(dat, labeled_short_names)
 
 cat("\nAll cost-impact scatter plots written.\n")
