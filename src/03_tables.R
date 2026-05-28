@@ -1186,11 +1186,11 @@ primary_idx <- which(!is.na(dat$training_role) & dat$training_role == "primary")
 sector_idx  <- which(!is.na(dat$sector_program) & dat$sector_program == 1)
 all_idx     <- seq_len(nrow(dat))
 
-# Column groups per table. Each group is one Mean/SD/N triplet: `prefix` keys
-# the column ids, `header` is the spanning super-header, `idx` selects rows.
-# The descriptives table carries a sector-program triplet (all sector programs,
-# regardless of training role); the outcomes table keeps the original two.
-desc_groups_traits <- list(
+# Column groups shared by both descriptive tables. Each group is one
+# Mean/SD/N triplet: `prefix` keys the column ids, `header` is the spanning
+# super-header, `idx` selects rows. Sector programs are the full sector
+# subset (all `sector_program == 1` rows, regardless of training_role).
+desc_groups <- list(
   list(prefix = "all",     header = "Experiments incorporating training",
        idx = all_idx),
   list(prefix = "primary", header = "Those with training primary",
@@ -1198,19 +1198,12 @@ desc_groups_traits <- list(
   list(prefix = "sector",  header = "Sector programs",
        idx = sector_idx)
 )
-desc_groups_outcomes <- list(
-  list(prefix = "all",     header = "Experiments incorporating training",
-       idx = all_idx),
-  list(prefix = "primary", header = "Those with training primary",
-       idx = primary_idx)
-)
 col_ids_for <- function(groups)
   unlist(lapply(groups, function(g)
     paste0(g$prefix, c("_mean", "_se", "_n"))))
 
-# fmt_row / blank_row / section_row read this global; set it to match the
-# table being built before its rows are constructed.
-desc_col_ids <- col_ids_for(desc_groups_traits)
+# fmt_row / blank_row / section_row read this global.
+desc_col_ids <- col_ids_for(desc_groups)
 
 fmt_v_cells <- function(stats, digits = 2, big_mark = "") {
   if (is.na(stats[["mean"]])) return(c("–", "", ""))
@@ -1250,7 +1243,7 @@ build_traits_rows <- function() {
     if (i > 1) rows[[length(rows) + 1]] <- blank_row()
     rows[[length(rows) + 1]] <- section_row(rd$section)
     for (varname in names(rd$vars)) {
-      vals <- lapply(desc_groups_traits,
+      vals <- lapply(desc_groups,
                      function(g) descriptive_value(varname, g$idx))
       digits_t <- if (varname %in% c("treatment_duration_months",
                                      "UNRATE_PLACEHOLDER")) 1L else 0L
@@ -1278,7 +1271,7 @@ build_outcomes_rows <- function() {
       oc_type <- oc[[1]]; hz <- oc[[2]]; lab <- oc[[3]]; digits_oc <- oc[[4]]
       y_col  <- paste0(hz, "_", oc_type, "_", yi_suffix)
       se_col <- paste0(hz, "_", oc_type, "_se")
-      vals <- lapply(desc_groups_outcomes, function(g)
+      vals <- lapply(desc_groups, function(g)
         ms_reml(dat[[y_col]][g$idx], dat[[se_col]][g$idx],
                 dat$project[g$idx]))
       list(values = fmt_row(lab, vals, digits = digits_oc), type = "coef")
@@ -1321,17 +1314,15 @@ write_desc_table <- function(rows, groups, basename, caption, footer) {
   cat("  HTML: ", html_path, "\n", sep = "")
 }
 
-desc_col_ids <- col_ids_for(desc_groups_traits)
 write_desc_table(
-  build_traits_rows(), desc_groups_traits,
+  build_traits_rows(), desc_groups,
   basename = "table_descriptives",
   caption  = "Study traits in U.S.-based job training experiments",
   footer   = paste(
     'Notes: Full sample is 144 estimates from 56 studies. Averages are unweighted. Sample sizes vary because of missing data. For multi-region experiments, “regional” unemployment is national.'))
 
-desc_col_ids <- col_ids_for(desc_groups_outcomes)
 write_desc_table(
-  build_outcomes_rows(), desc_groups_outcomes,
+  build_outcomes_rows(), desc_groups,
   basename = "table_outcomes",
   caption  = "Control groups means and impact estimates in U.S.-based job training experiments",
   footer   = paste(
