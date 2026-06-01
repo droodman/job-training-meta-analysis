@@ -100,7 +100,13 @@ function update() {
   const img = document.getElementById('plot');
   const label = document.getElementById('filename');
   const scrollY = window.scrollY;
-  img.style.maxWidth = zoom + '%';
+  // Size the plot from the zoom control alone, as an absolute pixel width, so
+  // it does NOT auto-shrink when the browser window is resized. Zoom is a
+  // percentage of a fixed reference width rather than of the (window-sized)
+  // container.
+  const REF_WIDTH = 1400;
+  img.style.width = (REF_WIDTH * zoom / 100) + 'px';
+  img.style.maxWidth = 'none';
   document.getElementById('zoomLabel').textContent = zoom + '%';
   img.onerror = function() {
     img.style.display = 'none';
