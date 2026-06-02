@@ -29,8 +29,8 @@
 <div class="controls">
   <div class="control-group">
     <div class="group-label">Outcome</div>
-    <label><input type="radio" name="outcome" value="program_uptake"> Program uptake</label>
-    <label><input type="radio" name="outcome" value="any_training"> Any training uptake</label>
+    <label><input type="radio" name="outcome" value="program_takeup"> Program take-up</label>
+    <label><input type="radio" name="outcome" value="any_training"> Any training take-up</label>
     <label><input type="radio" name="outcome" value="emp" checked> Employment</label>
     <label><input type="radio" name="outcome" value="earn"> Earnings</label>
   </div>
@@ -82,7 +82,7 @@
 </div>
 </div>
 <script>
-const noHorizon = { program_uptake: true, any_training: true };
+const noHorizon = { program_takeup: true, any_training: true };
 function getRadio(name) {
   return document.querySelector(`input[name="${name}"]:checked`).value;
 }

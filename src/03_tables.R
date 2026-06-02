@@ -1256,7 +1256,11 @@ build_traits_rows <- function() {
 }
 
 build_outcomes_rows <- function() {
+  # First-stage (take-up) outcomes have no time-horizon prefix; they are
+  # listed first so they precede the employment and earnings impacts.
   outcomes <- list(
+    list("program_takeup", "", "Program take-up (%)",        1L),
+    list("any_training",   "", "Any training take-up (%)",    1L),
     list("emp",  "st", "Employment, short-term (%)",      1L),
     list("emp",  "mt", "Employment, medium-term (%)",     1L),
     list("emp",  "lt", "Employment, long-term (%)",       1L),
@@ -1269,8 +1273,10 @@ build_outcomes_rows <- function() {
   reml_section <- function(yi_suffix) {
     function(oc) {
       oc_type <- oc[[1]]; hz <- oc[[2]]; lab <- oc[[3]]; digits_oc <- oc[[4]]
-      y_col  <- paste0(hz, "_", oc_type, "_", yi_suffix)
-      se_col <- paste0(hz, "_", oc_type, "_se")
+      # First-stage outcomes (hz == "") carry no time-horizon prefix.
+      colbase <- if (hz == "") oc_type else paste0(hz, "_", oc_type)
+      y_col  <- paste0(colbase, "_", yi_suffix)
+      se_col <- paste0(colbase, "_se")
       vals <- lapply(desc_groups, function(g)
         ms_reml(dat[[y_col]][g$idx], dat[[se_col]][g$idx],
                 dat$project[g$idx]))

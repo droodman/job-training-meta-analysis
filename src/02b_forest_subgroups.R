@@ -133,10 +133,10 @@ subgroups <- list(
 )
 
 # Sentinel ".resprate" resolves to a horizon- and outcome-specific column
-# precomputed in 01_prep.R. Uptake outcomes (no horizon) use the uptake column.
+# precomputed in 01_prep.R. take-up outcomes (no horizon) use the take-up column.
 resolve_resprate_var <- function(oc, prefix) {
-  if (oc$name %in% c("program_uptake", "any_training")) {
-    "resprate_label_uptake"
+  if (oc$name %in% c("program_takeup", "any_training")) {
+    "resprate_label_takeup"
   } else {
     paste0("resprate_label_", oc$name, "_", prefix)
   }
@@ -153,17 +153,17 @@ outcome_types <- list(
        title_name = "earnings",
        xlab = "Earnings impact (2025$, annualized)",  file_prefix = "forest_earn", dig = 0L,
        alim = NULL, xlim = NULL),
-  list(name = "program_uptake",
-       imp_suffix = "program_uptake_impact", se_suffix = "program_uptake_se",
-       title_name = "Program uptake",
-       xlab = "Program uptake impact (percentage points)",
-       file_prefix = "forest_program_uptake", dig = 1L,
+  list(name = "program_takeup",
+       imp_suffix = "program_takeup_impact", se_suffix = "program_takeup_se",
+       title_name = "Program take-up",
+       xlab = "Program take-up impact (percentage points)",
+       file_prefix = "forest_program_takeup", dig = 1L,
        alim = NULL, xlim = NULL,
        no_horizon = TRUE),
   list(name = "any_training",
        imp_suffix = "any_training_impact", se_suffix = "any_training_se",
-       title_name = "Any training uptake",
-       xlab = "Any training uptake impact (percentage points)",
+       title_name = "Any training take-up",
+       xlab = "Any training take-up impact (percentage points)",
        file_prefix = "forest_any_training", dig = 1L,
        alim = NULL, xlim = NULL,
        no_horizon = TRUE)

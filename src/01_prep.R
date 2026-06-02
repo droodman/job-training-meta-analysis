@@ -24,8 +24,8 @@ library(openxlsx)
 # Using openxlsx rather than readxl: readxl returns NA when a formula cell
 # has no cached value, which has bitten us before.
 
-dat <- read.xlsx("data/extraction_full_v35.xlsx", sheet = "Data Table")
-reasoning <- read.xlsx("data/extraction_full_v35.xlsx", sheet = "Reasoning Table")
+dat <- read.xlsx("data/extraction_full_v52.xlsx", sheet = "Data Table")
+reasoning <- read.xlsx("data/extraction_full_v52.xlsx", sheet = "Reasoning Table")
 
 # openxlsx does not auto-decode XML/HTML entities — strings like "PACE &#8211;
 # Year Up" or "GAIN Education &amp; Training" arrive with the entity literals
@@ -126,13 +126,13 @@ for (prefix in c("st", "mt", "lt")) {
               toupper(prefix), n_reported, n_computed, n_still_missing, n_impact))
 }
 
-# ── 2b. Compute uptake SEs ───────────────────────────────────────────────────
+# ── 2b. Compute take-up SEs ───────────────────────────────────────────────────
 #
-# Uptake of evaluated program and uptake of any training are binary outcomes
+# take-up of evaluated program and take-up of any training are binary outcomes
 # like employment, but without time-horizon prefixes. Compute SEs from
 # proportions using the same Agresti-Caffo approach.
 
-for (outcome in c("program_uptake", "any_training")) {
+for (outcome in c("program_takeup", "any_training")) {
   imp_col  <- paste0(outcome, "_impact")
   se_col   <- paste0(outcome, "_se")
   cm_col   <- paste0(outcome, "_control_mean")
@@ -141,6 +141,15 @@ for (outcome in c("program_uptake", "any_training")) {
   # Initialize SE and source columns
   dat[[se_col]]  <- NA_real_
   dat[[src_col]] <- ifelse(is.na(dat[[imp_col]]), NA_character_, "missing")
+
+  # Missing control-group take-up means zero: when a study reports a take-up
+  # impact but leaves the control mean blank, the control group had effectively
+  # no access to the evaluated program, so treat the control mean as 0.
+  fill_zero <- !is.na(dat[[imp_col]]) & is.na(dat[[cm_col]])
+  dat[[cm_col]][fill_zero] <- 0
+  if (any(fill_zero))
+    cat(sprintf("%s: %d missing control means set to 0 (impact reported)\n",
+                outcome, sum(fill_zero)))
 
   # Compute SE from proportions where possible
   can_compute <- !is.na(dat[[imp_col]]) &
@@ -472,32 +481,32 @@ cat(sprintf("Measured earnings impact (2025$, summed across populated horizons):
 
 # Rescale cost_per_treated and benefit_per_treated to a per-T-assignee basis
 # for rows whose source reports them per person actually enrolled in training.
-# per_assigned = per_enrolled * (uptake_T / 100), where uptake_T is the
+# per_assigned = per_enrolled * (take-up_T / 100), where take-up_T is the
 # percentage of the treatment group that took up training =
-# program_uptake_control_mean + program_uptake_impact. Uptake columns are
+# program_takeup_control_mean + program_takeup_impact. take-up columns are
 # stored in percentage points (0-100), so divide by 100 to get a fraction.
 rescale_to_assigned <- !is.na(dat$cost_denominator) &
   dat$cost_denominator == "T-enrolled"
 rescale_missing <- rescale_to_assigned &
-  (is.na(dat$program_uptake_impact) | is.na(dat$program_uptake_control_mean))
+  (is.na(dat$program_takeup_impact) | is.na(dat$program_takeup_control_mean))
 if (any(rescale_missing)) {
-  warning("T-enrolled rows missing uptake data: ",
+  warning("T-enrolled rows missing take-up data: ",
           paste(unique(dat$project[rescale_missing]), collapse = "; "))
 }
 rescale_to_assigned <- rescale_to_assigned & !rescale_missing
-uptake_t_frac <- (dat$program_uptake_control_mean +
-                  dat$program_uptake_impact) / 100
+takeup_t_frac <- (dat$program_takeup_control_mean +
+                  dat$program_takeup_impact) / 100
 
 cost_mask <- rescale_to_assigned & !is.na(dat$cost_per_treated)
 dat$cost_per_treated[cost_mask] <-
-  dat$cost_per_treated[cost_mask] * uptake_t_frac[cost_mask]
+  dat$cost_per_treated[cost_mask] * takeup_t_frac[cost_mask]
 cat(sprintf("Cost: %d T-enrolled rows rescaled to per-T-assignee basis\n",
             sum(cost_mask)))
 
 if ("benefit_per_treated" %in% names(dat)) {
   ben_mask <- rescale_to_assigned & !is.na(dat$benefit_per_treated)
   dat$benefit_per_treated[ben_mask] <-
-    dat$benefit_per_treated[ben_mask] * uptake_t_frac[ben_mask]
+    dat$benefit_per_treated[ben_mask] * takeup_t_frac[ben_mask]
   cat(sprintf("Benefit: %d T-enrolled rows rescaled to per-T-assignee basis\n",
               sum(ben_mask)))
 }
@@ -583,7 +592,7 @@ stopifnot("Unclassified earn_data_source rows" = sum(is.na(dat$earn_data_source)
 # For each (horizon, outcome) combination, classify a study as high or low
 # response rate. Threshold = 80%. If the relevant outcome data source is
 # administrative records, treat as high (admin records cover the universe).
-# Uptake outcomes use short-term overall response rate, no admin override.
+# take-up outcomes use short-term overall response rate, no admin override.
 
 classify_resprate <- function(resprate, admin_override) {
   factor(ifelse(admin_override, "\u226580%",
@@ -610,7 +619,7 @@ for (prefix in c("st", "mt", "lt")) {
   }
 }
 
-dat$resprate_label_uptake <- classify_resprate(
+dat$resprate_label_takeup <- classify_resprate(
   dat$st_resprate_overall, rep(FALSE, nrow(dat)))
 
 cat("\n=== Response rate (employment, short-term) ===\n")
@@ -1027,16 +1036,16 @@ for (prefix in c("st", "mt", "lt")) {
   }
 }
 
-cat("\n=== Uptake SE source summary ===\n")
-for (outcome in c("program_uptake", "any_training")) {
+cat("\n=== take-up SE source summary ===\n")
+for (outcome in c("program_takeup", "any_training")) {
   src_col <- paste0(outcome, "_se_source")
   tbl <- table(dat[[src_col]], useNA = "always")
   cat(outcome, ":\n")
   print(tbl)
 }
 
-cat("\n=== Rows with uptake impact but still no SE ===\n")
-for (outcome in c("program_uptake", "any_training")) {
+cat("\n=== Rows with take-up impact but still no SE ===\n")
+for (outcome in c("program_takeup", "any_training")) {
   imp_col <- paste0(outcome, "_impact")
   se_col  <- paste0(outcome, "_se")
   problem <- which(!is.na(dat[[imp_col]]) & is.na(dat[[se_col]]))
