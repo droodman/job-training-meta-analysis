@@ -48,7 +48,7 @@ highlight_groups <- list(
        match = function(d) d$project == "WIA Gold Standard"),
   list(label = "National JTPA Study",      col = "#ef3b2c",
        match = function(d) d$project == "National JTPA Study"),
-  list(label = "National Job Corps Study", col = "#fc9272",
+  list(label = "National Job Corps Study", col = "#fb9a99",
        match = function(d) d$project == "National Job Corps Study"),
   # High-performing sector programs — shades of green
   list(label = "PACE – Year Up",      col = "#005a32",
@@ -73,7 +73,6 @@ highlight_index <- function(d) {
 # evaluated against the line's plotted points:
 #   "right"             — right of the latest (max time_point) dot
 #   "above_max"         — above the highest-impact dot
-#   "above_penultimate" — above the second-latest dot (by time)
 #   "above_x"           — above the dot nearest x = `x` years
 # `dy` optionally nudges the label vertically, in character heights.
 # WIA / JTPA placements are a first pass — their lines sit in the crowded
@@ -98,7 +97,7 @@ estimate_labels <- list(
   list(proj = "Project QUEST",            site = NULL,
        text = "Project QUEST",    place = "right"),
   list(proj = "WorkAdvance",              site = "Per Scholas (Bronx)",
-       text = "Per Scholas",      place = "above_penultimate", dy=1),
+       text = "Per Scholas",      place = "right"),
   list(proj = "Sectoral Employment Impact Study",
        site = "Per Scholas (Bronx, IT) [SEIS]",
        text = "Per Scholas",      place = "above_max")
@@ -116,8 +115,6 @@ draw_labels <- function(d) {
 
     if (L$place == "above_max") {
       i <- which.max(e$impact); pos <- 3
-    } else if (L$place == "above_penultimate") {
-      i <- max(1, nrow(e) - 1); pos <- 3
     } else if (L$place == "above_x") {
       i <- which.min(abs(e$time_point - L$x)); pos <- 3
     } else {  # "right"

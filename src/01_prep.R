@@ -24,8 +24,8 @@ library(openxlsx)
 # Using openxlsx rather than readxl: readxl returns NA when a formula cell
 # has no cached value, which has bitten us before.
 
-dat <- read.xlsx("data/extraction_full_v60.xlsx", sheet = "Data Table")
-reasoning <- read.xlsx("data/extraction_full_v60.xlsx", sheet = "Reasoning Table")
+dat <- read.xlsx("data/extraction_full_v61.xlsx", sheet = "Data Table")
+reasoning <- read.xlsx("data/extraction_full_v61.xlsx", sheet = "Reasoning Table")
 
 # openxlsx does not auto-decode XML/HTML entities — strings like "PACE &#8211;
 # Year Up" or "GAIN Education &amp; Training" arrive with the entity literals
