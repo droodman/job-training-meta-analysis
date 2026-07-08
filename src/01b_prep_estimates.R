@@ -36,7 +36,7 @@ options(error = function() {
 
 library(openxlsx)
 
-XLSX <- "data/extraction_full_v61.xlsx"
+XLSX <- "data/extraction_full_v62.xlsx"
 ie <- read.xlsx(XLSX, sheet = "Impact Estimates")
 
 # ── 1. Decode HTML entities (mirrors 01_prep.R) ───────────────────────────────

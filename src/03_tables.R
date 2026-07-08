@@ -1255,6 +1255,71 @@ build_traits_rows <- function() {
   rows
 }
 
+# ── Stacked-cell variant (used by the outcomes table only) ───────────────────
+# Each group renders as two columns instead of three: an estimate column that
+# stacks the SD/SE under the point estimate in parentheses, plus an N column.
+# The descriptives table keeps the side-by-side Mean/SD/N layout above.
+desc_col_ids_stacked <- unlist(lapply(desc_groups, function(g)
+  paste0(g$prefix, c("_mean", "_n"))))
+
+fmt_v_cells_stacked <- function(stats, digits = 2, big_mark = "") {
+  if (is.na(stats[["mean"]])) return(c("–", ""))
+  m <- formatC(stats[["mean"]], format = "f", digits = digits,
+               big.mark = big_mark)
+  est <- if (is.na(stats[["sd"]])) m else
+    paste0(m, "\n(",
+           formatC(stats[["sd"]], format = "f", digits = digits,
+                   big.mark = big_mark), ")")
+  n_str <- if (is.na(stats[["n"]]) || stats[["n"]] == 0) ""
+           else as.character(stats[["n"]])
+  c(est, n_str)
+}
+fmt_row_stacked <- function(label, vals, digits = 2) {
+  big_mark <- if (grepl("\\$|sample size", label, ignore.case = TRUE)) ","
+              else ""
+  cells <- unlist(lapply(vals, fmt_v_cells_stacked, digits = digits,
+                         big_mark = big_mark))
+  out <- c(sprintf("  %s", label), cells)
+  names(out) <- c("variable", desc_col_ids_stacked)
+  out
+}
+blank_row_stacked <- function() {
+  bv <- rep("", length(desc_col_ids_stacked) + 1L)
+  names(bv) <- c("variable", desc_col_ids_stacked)
+  list(values = bv, type = "blank")
+}
+section_row_stacked <- function(title) {
+  sr <- c(title, rep("", length(desc_col_ids_stacked)))
+  names(sr) <- c("variable", desc_col_ids_stacked)
+  list(values = sr, type = "section")
+}
+
+# Header for the stacked layout: super-header per group spanning 2 columns,
+# sub-headers "Mean" / "N" (the SD/SE now sits under the mean in parentheses).
+apply_desc_headers_stacked <- function(ft, groups) {
+  ids   <- unlist(lapply(groups, function(g)
+    paste0(g$prefix, c("_mean", "_n"))))
+  jdata <- 2:(length(ids) + 1L)             # data columns (2 per group)
+  sub <- setNames(as.list(rep(c("Mean", "N"), length(groups))), ids)
+  ft <- set_header_labels(ft, values = c(list(variable = ""), sub))
+  ft <- add_header_row(ft,
+    values    = c("", vapply(groups, `[[`, "", "header")),
+    colwidths = c(1, rep(2, length(groups))),
+    top       = TRUE)
+  ft <- bold(ft, j = jdata, part = "header")
+  ft <- align(ft, j = jdata, align = "center", part = "header")
+  ft <- width(ft, j = 1, width = 2.8)
+  # Estimate columns (odd positions within jdata) wider than the N columns.
+  mean_j <- jdata[seq(1, length(jdata), by = 2)]
+  n_j    <- jdata[seq(2, length(jdata), by = 2)]
+  ft <- width(ft, j = mean_j, width = 1.05)
+  ft <- width(ft, j = n_j,    width = 0.55)
+  thin_rule <- fp_border(color = "black", width = 0.5)
+  ft <- hline(ft, i = 1, j = jdata, part = "header", border = thin_rule)
+  ft <- padding(ft, padding.top = 1, part = "footer")
+  ft
+}
+
 build_outcomes_rows <- function() {
   # First-stage (take-up) outcomes have no time-horizon prefix; they are
   # listed first so they precede the employment and earnings impacts.
@@ -1280,29 +1345,31 @@ build_outcomes_rows <- function() {
       vals <- lapply(desc_groups, function(g)
         ms_reml(dat[[y_col]][g$idx], dat[[se_col]][g$idx],
                 dat$project[g$idx]))
-      list(values = fmt_row(lab, vals, digits = digits_oc), type = "coef")
+      list(values = fmt_row_stacked(lab, vals, digits = digits_oc),
+           type = "coef")
     }
   }
   rows <- list()
-  rows[[length(rows) + 1]] <- section_row("Control-group means")
+  rows[[length(rows) + 1]] <- section_row_stacked("Control-group means")
   for (oc in outcomes) rows[[length(rows) + 1]] <- reml_section("control_mean")(oc)
-  rows[[length(rows) + 1]] <- blank_row()
-  rows[[length(rows) + 1]] <- section_row("Impacts")
+  rows[[length(rows) + 1]] <- blank_row_stacked()
+  rows[[length(rows) + 1]] <- section_row_stacked("Impacts")
   for (oc in outcomes) rows[[length(rows) + 1]] <- reml_section("impact")(oc)
   rows
 }
 
-write_desc_table <- function(rows, groups, basename, caption, footer) {
+write_desc_table <- function(rows, groups, basename, caption, footer,
+                             header_fn = apply_desc_headers) {
   obj <- rows_to_df(rows)
   ft <- style_table(obj$df, obj$row_types, caption, footer)
-  ft <- apply_desc_headers(ft, groups)
+  ft <- header_fn(ft, groups)
   rtf_path <- sprintf("output/%s.rtf", basename)
   save_as_rtf(ft, path = rtf_path)
   cat("  RTF: ", rtf_path, "\n", sep = "")
 
   ft_h <- style_table(obj$df, obj$row_types, caption, footer,
                       fontname = "Source Serif 4")
-  ft_h <- apply_desc_headers(ft_h, groups)
+  ft_h <- header_fn(ft_h, groups)
   html_path <- sprintf("output/%s.html", basename)
   html_body <- flextable:::gen_raw_html(ft_h)
   # flextable's gen_raw_html drops the caption set by set_caption(); inject
@@ -1332,6 +1399,7 @@ write_desc_table(
   basename = "table_outcomes",
   caption  = "Control groups means and impact estimates in U.S.-based job training experiments",
   footer   = paste(
-    'Notes: Impacts are estimated with random-effects maximum likelihood (REML) meta-analysis. Control-group statistics are com-puted using the corresponding REML weights. “SD/SE” columns hold standard deviations of control-group values and standard errors of impact estimates. Sample sizes vary because of missing data. Short-term outcomes have a ~1-year fol-low-up, medium-term ~2 years, and long-term ~3-5 years.'))
+    'Notes: Impacts are estimated with random-effects maximum likelihood (REML) meta-analysis. Control-group statistics are com-puted using the corresponding REML weights. Figures in parentheses below each estimate are standard deviations of control-group values and standard errors of impact estimates. Sample sizes vary because of missing data. Short-term outcomes have a ~1-year fol-low-up, medium-term ~2 years, and long-term ~3-5 years.'),
+  header_fn = apply_desc_headers_stacked)
 
 cat("\nAll tables written.\n")
