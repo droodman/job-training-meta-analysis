@@ -210,7 +210,10 @@ make_estimates_scatter <- function(outcome_type, ylab, file_suffix,
 
   draw_labels(d)
 
-  leg <- legend("topright",
+  # Anchor at the top-right corner, but nudged 2 character widths to the left.
+  usr <- par("usr")
+  leg <- legend(x = usr[2] - 2 * par("cxy")[1], y = usr[4],
+                xjust = 1, yjust = 1,
                 legend = c("Training is primary in treatment",
                            "Training is secondary"),
                 pch = c(19, 1), col = c("grey60", "grey40"),
@@ -244,7 +247,7 @@ make_estimates_scatter <- function(outcome_type, ylab, file_suffix,
   draw_swatch(1, vapply(highlight_groups[1:3], `[[`, "", "col"),
               "Federal programs")
   draw_swatch(2, vapply(highlight_groups[4:6], `[[`, "", "col"),
-              "High-impact sector programs")
+              "Selected high-impact sector programs")
 
   cat(sprintf("Saved %s (k=%d points, %d experiments)\n",
               filename, nrow(d), n_studies))
