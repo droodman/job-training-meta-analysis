@@ -31,6 +31,8 @@
     <div class="group-label">Outcome</div>
     <label><input type="radio" name="outcome" value="emp" checked> Employment</label>
     <label><input type="radio" name="outcome" value="earn"> Earnings</label>
+    <label><input type="radio" name="outcome" value="program_takeup"> Program take-up</label>
+    <label><input type="radio" name="outcome" value="any_training"> Any-training take-up</label>
   </div>
   <div class="control-group">
     <div class="group-label">Time horizon</div>
@@ -109,8 +111,14 @@ function update() {
   const hz = getRadio('horizon');
   const ap = getRadio('approach');
   const sm = getRadio('sample');
-  const fn = `table_${oc}_${hz}_${ap}${sm}.html`;
-  const corrFn = `corr_${oc}_${hz}_${ap}${sm}.html`;
+  // Take-up outcomes are horizon-less: their filenames omit the time horizon,
+  // and the horizon control is disabled while one is selected.
+  const isTakeup = (oc === 'program_takeup' || oc === 'any_training');
+  document.querySelectorAll('input[name="horizon"]').forEach(r => r.disabled = isTakeup);
+  const fn = isTakeup ? `table_${oc}_${ap}${sm}.html`
+                      : `table_${oc}_${hz}_${ap}${sm}.html`;
+  const corrFn = isTakeup ? `corr_${oc}_${ap}${sm}.html`
+                          : `corr_${oc}_${hz}_${ap}${sm}.html`;
   const frame = document.getElementById('tableFrame');
   const corrFrame = document.getElementById('corrFrame');
   const label = document.getElementById('filename');

@@ -32,9 +32,17 @@ dat$target_pop <- factor(
 # Data source moderator switches depending on outcome (emp vs earn).
 
 make_specs <- function(outcome_type, hz, approach = "cc") {
+  is_takeup <- outcome_type %in% takeup_outcomes
   ds_var <- if (outcome_type == "emp") "emp_data_source" else "earn_data_source"
   rr_var <- paste0("resprate_", outcome_type, "_", hz)
-  un_var <- paste0("unrate_", hz)
+  # Take-up outcomes are horizon-less: use unemployment at randomization, and a
+  # Study-characteristics block with the categorical take-up response-rate flag
+  # plus academic (no data-source split, no continuous response rate).
+  un_var <- if (is_takeup) "unrate_at_rand" else paste0("unrate_", hz)
+  spec7 <- if (is_takeup)
+    as.formula("~ resprate_label_takeup + academic")
+  else
+    as.formula(sprintf("~ %s + %s + academic", ds_var, rr_var))
   list(
     "(1)" = list(
       formula = as.formula(sprintf(
@@ -68,7 +76,7 @@ make_specs <- function(outcome_type, hz, approach = "cc") {
       label = "Administration"
     ),
     "(7)" = list(
-      formula = as.formula(sprintf("~ %s + %s + academic", ds_var, rr_var)),
+      formula = spec7,
       label = "Study characteristics"
     )
   )
@@ -212,11 +220,33 @@ pool_rma <- function(fits) {
 
 # ── 5. Fit one specification ─────────────────────────────────────────────────
 
+# Column stem for an (outcome, horizon). Take-up outcomes (program_takeup,
+# any_training) are horizon-less, so hz is "" and the stem is just the outcome
+# name (e.g. "program_takeup_impact"); emp/earn use "<hz>_<oc>".
+col_base <- function(hz, oc) if (hz == "") oc else paste0(hz, "_", oc)
+
+# Take-up outcomes carry no time-horizon prefix and lack the data-source /
+# continuous-response-rate moderators that emp/earn use.
+takeup_outcomes <- c("program_takeup", "any_training")
+
+# One imputed data set (i), restricted to `idx`, with the derived columns that
+# mice does not impute carried over complete from `dat`. unrate_at_rand and
+# resprate_label_takeup are needed only by take-up specs; they are harmless
+# (unused) extra columns for emp/earn fits.
+mi_complete <- function(i, idx) {
+  d_i <- complete(imp, i)[idx, , drop = FALSE]
+  d_i$census_region         <- dat$census_region[idx]
+  d_i$census_division       <- dat$census_division[idx]
+  d_i$unrate_at_rand        <- dat$unrate_at_rand[idx]
+  d_i$resprate_label_takeup <- dat$resprate_label_takeup[idx]
+  d_i
+}
+
 # Returns the row indices into `dat` for studies with non-missing impact and
 # SE for the given (horizon, outcome), restricted to the active sample.
 panel_idx <- function(hz, outcome_type, sample_idx) {
-  imp_col <- paste0(hz, "_", outcome_type, "_impact")
-  se_col  <- paste0(hz, "_", outcome_type, "_se")
+  imp_col <- paste0(col_base(hz, outcome_type), "_impact")
+  se_col  <- paste0(col_base(hz, outcome_type), "_se")
   idx <- which(!is.na(dat[[imp_col]]) & !is.na(dat[[se_col]]))
   intersect(idx, sample_idx)
 }
@@ -230,8 +260,8 @@ robustify <- function(fit, cluster) {
 }
 
 fit_spec <- function(hz, outcome_type, frm, approach, sample_idx) {
-  imp_col <- paste0(hz, "_", outcome_type, "_impact")
-  se_col  <- paste0(hz, "_", outcome_type, "_se")
+  imp_col <- paste0(col_base(hz, outcome_type), "_impact")
+  se_col  <- paste0(col_base(hz, outcome_type), "_se")
   idx <- panel_idx(hz, outcome_type, sample_idx)
   if (length(idx) < 3) return(NULL)
   yi  <- dat[[imp_col]][idx]
@@ -246,9 +276,7 @@ fit_spec <- function(hz, outcome_type, frm, approach, sample_idx) {
   } else {
     fits <- list()
     for (i in 1:m_imp) {
-      d_i <- complete(imp, i)[idx, , drop = FALSE]
-      d_i$census_region <- dat$census_region[idx]
-      d_i$census_division <- dat$census_division[idx]
+      d_i <- mi_complete(i, idx)
       f <- tryCatch(rma(yi = yi, sei = sei, mods = frm, data = d_i,
                         method = "REML"),
                     error = function(e) NULL)
@@ -279,7 +307,7 @@ get_surviving_coefs <- function(fit, formula, hz, oc_type, approach, sample_idx,
     pvals <- as.numeric(fit$p)
   }
 
-  imp_col <- paste0(hz, "_", oc_type, "_impact")
+  imp_col <- paste0(col_base(hz, oc_type), "_impact")
   idx <- panel_idx(hz, oc_type, sample_idx)
   sd_y <- sd(dat[[imp_col]][idx], na.rm = TRUE)
 
@@ -289,9 +317,7 @@ get_surviving_coefs <- function(fit, formula, hz, oc_type, approach, sample_idx,
     setNames(apply(mm, 2, sd, na.rm = TRUE), colnames(mm))
   } else {
     sds <- sapply(seq_len(m_imp), function(i) {
-      d_i <- complete(imp, i)[idx, , drop = FALSE]
-      d_i$census_region   <- dat$census_region[idx]
-      d_i$census_division <- dat$census_division[idx]
+      d_i <- mi_complete(i, idx)
       mm <- model.matrix(formula, data = d_i)
       apply(mm, 2, sd)
     })
@@ -336,8 +362,8 @@ augment_with_coefs <- function(d, coefs) {
 # group regression.
 fit_survivor_spec <- function(hz, oc_type, approach, coefs, sample_idx) {
   if (length(coefs) == 0) return(NULL)
-  imp_col <- paste0(hz, "_", oc_type, "_impact")
-  se_col  <- paste0(hz, "_", oc_type, "_se")
+  imp_col <- paste0(col_base(hz, oc_type), "_impact")
+  se_col  <- paste0(col_base(hz, oc_type), "_se")
   idx <- panel_idx(hz, oc_type, sample_idx)
   if (length(idx) < 3) return(NULL)
   yi  <- dat[[imp_col]][idx]
@@ -355,9 +381,7 @@ fit_survivor_spec <- function(hz, oc_type, approach, coefs, sample_idx) {
   } else {
     fits <- list()
     for (i in seq_len(m_imp)) {
-      d_i <- complete(imp, i)[idx, , drop = FALSE]
-      d_i$census_region   <- dat$census_region[idx]
-      d_i$census_division <- dat$census_division[idx]
+      d_i <- mi_complete(i, idx)
       d_aug <- augment_with_coefs(d_i, coefs)
       f <- tryCatch(rma(yi = yi, sei = sei, mods = surv_formula,
                         data = d_aug, method = "REML"),
@@ -469,9 +493,7 @@ write_corr_matrix <- function(coefs, hz, oc_type, approach, sample_suffix,
     k_used <- sum(cc)
   } else {
     cors <- lapply(seq_len(m_imp), function(i) {
-      d_i <- complete(imp, i)[idx, , drop = FALSE]
-      d_i$census_region   <- dat$census_region[idx]
-      d_i$census_division <- dat$census_division[idx]
+      d_i <- mi_complete(i, idx)
       d_aug <- augment_with_coefs(d_i, coefs)
       cor(as.matrix(d_aug[, coefs, drop = FALSE]))
     })
@@ -480,13 +502,17 @@ write_corr_matrix <- function(coefs, hz, oc_type, approach, sample_suffix,
   }
   if (any(is.nan(cor_mat))) cor_mat[is.nan(cor_mat)] <- NA
 
-  oc_label <- c(emp = "Employment", earn = "Earnings")[oc_type]
+  oc_label <- c(emp = "Employment", earn = "Earnings",
+                program_takeup = "Program take-up",
+                any_training = "Any-training take-up")[oc_type]
   hz_label <- c(st = "Short-term", mt = "Medium-term", lt = "Long-term")[hz]
   ap_label <- if (approach == "cc") "complete-case" else "MI averaged"
-  caption <- sprintf("Survivor correlations: %s, %s (%s, k = %d)",
-                     oc_label, hz_label, ap_label, k_used)
-  filename <- sprintf("output/corr_%s_%s_%s%s.html",
-                      oc_type, hz, approach, sample_suffix)
+  caption <- sprintf("Survivor correlations: %s%s (%s, k = %d)",
+                     oc_label, if (is.na(hz_label)) "" else paste0(", ", hz_label),
+                     ap_label, k_used)
+  filename <- sprintf("output/corr_%s%s_%s%s.html",
+                      oc_type, if (hz == "") "" else paste0("_", hz),
+                      approach, sample_suffix)
   write_corr_html(cor_mat, filename, caption)
   cat(sprintf("  Corr: %s\n", filename))
 }
@@ -533,17 +559,32 @@ get_R2 <- function(fit, approach) {
 
 # Build rows for one panel (one outcome × one horizon × one approach)
 build_panel_rows <- function(hz, oc_type, oc_label, dig, approach, col_ids, sm) {
-  # Resolve placeholders for this outcome × horizon
+  is_takeup <- oc_type %in% takeup_outcomes
+  # Resolve placeholders for this outcome × horizon. Take-up outcomes have no
+  # data-source term, a categorical (not continuous) response rate, and use
+  # unemployment at randomization in place of the horizon-windowed rate.
   ds_coef <- if (oc_type == "emp") "emp_data_sourcesurvey" else "earn_data_sourcesurvey"
-  rr_coef <- paste0("resprate_", oc_type, "_", hz)
-  un_coef <- paste0("unrate_", hz)
+  rr_coef <- if (is_takeup) "resprate_label_takeup<80%" else paste0("resprate_", oc_type, "_", hz)
+  un_coef <- if (is_takeup) "unrate_at_rand" else paste0("unrate_", hz)
   panel_row_defs <- lapply(row_defs, function(rd) {
+    # Drop the data-source row for take-up (no survey/admin split).
+    if (is_takeup) rd$vars <- rd$vars[names(rd$vars) != "DATA_SOURCE_PLACEHOLDER"]
     idx <- which(names(rd$vars) == "DATA_SOURCE_PLACEHOLDER")
     if (length(idx) > 0) names(rd$vars)[idx] <- ds_coef
     idx <- which(names(rd$vars) == "RESPRATE_PLACEHOLDER")
-    if (length(idx) > 0) names(rd$vars)[idx] <- rr_coef
+    if (length(idx) > 0) {
+      names(rd$vars)[idx] <- rr_coef
+      if (is_takeup) rd$vars[[idx]] <- "Low response rate (<80%)"
+    }
     idx <- which(names(rd$vars) == "UNRATE_PLACEHOLDER")
-    if (length(idx) > 0) names(rd$vars)[idx] <- un_coef
+    if (length(idx) > 0) {
+      names(rd$vars)[idx] <- un_coef
+      if (is_takeup) rd$vars[[idx]] <- "Unemp. at randomization (%)"
+    }
+    # For take-up, the Study-characteristics section header references the
+    # omitted data-source category, which no longer applies.
+    if (is_takeup && grepl("^Study characteristics", rd$section))
+      rd$section <- "Study characteristics (omitted response rate: ≥80%)"
     rd
   })
   specs <- make_specs(oc_type, hz, approach)
@@ -802,11 +843,16 @@ for (sm in samples) {
 # Map placeholder names in row_defs to the actual model.matrix coefficient
 # names for a given (horizon, outcome).
 resolve_placeholder_coef <- function(varname, hz, oc_type) {
+  is_takeup <- oc_type %in% takeup_outcomes
   if (varname == "DATA_SOURCE_PLACEHOLDER")
-    return(if (oc_type == "emp") "emp_data_sourcesurvey"
+    return(if (is_takeup) "__na__"        # no data-source term for take-up
+           else if (oc_type == "emp") "emp_data_sourcesurvey"
            else "earn_data_sourcesurvey")
-  if (varname == "RESPRATE_PLACEHOLDER") return(paste0("resprate_", oc_type, "_", hz))
-  if (varname == "UNRATE_PLACEHOLDER")   return(paste0("unrate_", hz))
+  if (varname == "RESPRATE_PLACEHOLDER")
+    return(if (is_takeup) "resprate_label_takeup<80%"
+           else paste0("resprate_", oc_type, "_", hz))
+  if (varname == "UNRATE_PLACEHOLDER")
+    return(if (is_takeup) "unrate_at_rand" else paste0("unrate_", hz))
   varname
 }
 
@@ -821,9 +867,10 @@ combined_panels <- local({
   out
 })
 
-build_combined_survivors_rows <- function(sm) {
-  col_ids <- vapply(combined_panels, `[[`, character(1), "id")
-  panel_data <- lapply(combined_panels, function(p) {
+build_combined_survivors_rows <- function(sm, panels_spec = combined_panels,
+                                          takeup = FALSE) {
+  col_ids <- vapply(panels_spec, `[[`, character(1), "id")
+  panel_data <- lapply(panels_spec, function(p) {
     key <- paste(sm$suffix, p$approach, p$hz, p$oc, sep = "/")
     cached <- survivor_panel_cache[[key]]
     if (is.null(cached)) cached <- compute_survivor_panel(p$hz, p$oc, p$approach, sm)
@@ -833,11 +880,19 @@ build_combined_survivors_rows <- function(sm) {
   surv_sets <- lapply(panel_data, `[[`, "survivors")
 
   is_row_kept <- function(varname) {
-    any(vapply(seq_along(combined_panels), function(i) {
-      p <- combined_panels[[i]]
+    any(vapply(seq_along(panels_spec), function(i) {
+      p <- panels_spec[[i]]
       resolve_placeholder_coef(varname, p$hz, p$oc) %in% surv_sets[[i]]
     }, logical(1)))
   }
+
+  # Take-up tables relabel the response-rate placeholder (categorical, not %)
+  # and drop the data-source qualifier from the Study-characteristics header.
+  relabel <- function(varname, lab)
+    if (takeup && varname == "RESPRATE_PLACEHOLDER") "Low response rate (<80%)" else lab
+  resection <- function(sec)
+    if (takeup && grepl("^Study characteristics", sec))
+      "Study characteristics (omitted response rate: ≥80%)" else sec
 
   blank_vals <- setNames(c("", rep("", length(col_ids))), c("variable", col_ids))
 
@@ -845,15 +900,15 @@ build_combined_survivors_rows <- function(sm) {
   for (rd in row_defs) {
     kept_vars <- Filter(is_row_kept, names(rd$vars))
     if (length(kept_vars) == 0) next
-    sec_row <- setNames(c(rd$section, rep("", length(col_ids))),
+    sec_row <- setNames(c(resection(rd$section), rep("", length(col_ids))),
                         c("variable", col_ids))
     all_rows[[length(all_rows) + 1]] <- list(values = sec_row, type = "section")
     for (varname in kept_vars) {
-      display_label <- rd$vars[[varname]]
+      display_label <- relabel(varname, rd$vars[[varname]])
       for (rtype in c("coef", "se")) {
         vals <- c(if (rtype == "coef") sprintf("  %s", display_label) else "")
-        for (i in seq_along(combined_panels)) {
-          p <- combined_panels[[i]]
+        for (i in seq_along(panels_spec)) {
+          p <- panels_spec[[i]]
           resolved <- resolve_placeholder_coef(varname, p$hz, p$oc)
           cell <- get_coef_cell(fits[[i]], resolved, p$dig, p$approach)
           vals <- c(vals, cell[[rtype]])
@@ -867,19 +922,19 @@ build_combined_survivors_rows <- function(sm) {
   all_rows[[length(all_rows) + 1]] <- list(values = blank_vals, type = "blank")
 
   # MI indicator row (replaces a third header level)
-  mi_marks <- vapply(combined_panels, function(p)
+  mi_marks <- vapply(panels_spec, function(p)
     if (p$approach == "mi") "✓" else "", character(1))
   mi_vals <- c("Multiple imputation", mi_marks)
   names(mi_vals) <- c("variable", col_ids)
   all_rows[[length(all_rows) + 1]] <- list(values = mi_vals, type = "stat")
 
-  r2_vals <- c("R²", vapply(seq_along(combined_panels), function(i)
-    get_R2(fits[[i]], combined_panels[[i]]$approach), character(1)))
+  r2_vals <- c("R²", vapply(seq_along(panels_spec), function(i)
+    get_R2(fits[[i]], panels_spec[[i]]$approach), character(1)))
   names(r2_vals) <- c("variable", col_ids)
   all_rows[[length(all_rows) + 1]] <- list(values = r2_vals, type = "stat")
 
-  k_vals <- c("Number of experiments", vapply(seq_along(combined_panels), function(i) {
-    k <- get_k(fits[[i]], combined_panels[[i]]$approach)
+  k_vals <- c("Number of experiments", vapply(seq_along(panels_spec), function(i) {
+    k <- get_k(fits[[i]], panels_spec[[i]]$approach)
     if (is.na(k)) "" else as.character(k)
   }, character(1)))
   names(k_vals) <- c("variable", col_ids)
@@ -947,6 +1002,105 @@ for (sm in samples) {
   cat(sprintf("  HTML: %s\n", filename_html))
 }
 
+# ── 8c. Take-up meta-regression tables (standalone) ──────────────────────────
+#
+# Program take-up and any-training take-up are horizon-less binary outcomes.
+# They run through the same block-selection / survivor machinery as employment
+# and earnings, but as standalone tables (not merged into the emp/earn combined
+# survivors table). Setting uses unemployment at randomization; Study
+# characteristics uses the categorical take-up response-rate flag + academic.
+
+takeup_panels <- list(
+  list(oc = "program_takeup", label = "Program take-up (percentage points)",     dig = 1),
+  list(oc = "any_training",   label = "Any-training take-up (percentage points)", dig = 1)
+)
+
+wrap_html <- function(html_body) enc2utf8(paste0(
+  "<!DOCTYPE html>\n<html>\n<head><meta charset='UTF-8'>\n",
+  "<style>@import url('https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,200..900;1,8..60,200..900&display=swap');body{font-family:'Source Serif 4',serif;margin:20px;}table{border-collapse:collapse;}</style>\n",
+  "</head>\n<body>\n", html_body, "\n", iframe_resize_script, "\n</body>\n</html>\n"))
+
+cat("\nBuilding take-up meta-regression tables...\n")
+for (sm in samples) {
+  for (approach in c("cc", "mi")) {
+    app_label <- if (approach == "cc") "Complete Case"
+                 else sprintf("Multiple Imputation (m = %d)", m_imp)
+    cat(sprintf("Building take-up: %s [%s]...\n", app_label, sm$name))
+
+    # Combined two-panel RTF
+    all_rows <- list()
+    for (panel in takeup_panels)
+      all_rows <- c(all_rows, build_panel_rows("", panel$oc, panel$label,
+                                               panel$dig, approach, col_ids, sm))
+    combined <- rows_to_df(all_rows)
+    caption <- sprintf("Meta-Regression of Training Take-up (%s%s)", app_label,
+                       if (sm$suffix == "") "" else sprintf(", %s", sm$name))
+    ft <- style_table(combined$df, combined$row_types, caption, footer_note(approach))
+    filename <- sprintf("output/table_takeup_%s%s.rtf", approach, sm$suffix)
+    save_as_rtf(ft, path = filename)
+    cat(sprintf("  RTF: %s\n", filename))
+
+    # Separate per-outcome HTML tables
+    for (panel in takeup_panels) {
+      p <- rows_to_df(build_panel_rows("", panel$oc, panel$label, panel$dig,
+                                       approach, col_ids, sm))
+      caption_p <- sprintf("%s (%s%s)", panel$label, app_label,
+                           if (sm$suffix == "") "" else sprintf(", %s", sm$name))
+      ft_p <- style_table(p$df, p$row_types, caption_p, footer_note(approach),
+                          fontname = "Source Serif 4")
+      filename_html <- sprintf("output/table_%s_%s%s.html",
+                               panel$oc, approach, sm$suffix)
+      writeBin(charToRaw(wrap_html(flextable:::gen_raw_html(ft_p))), filename_html)
+      cat(sprintf("  HTML: %s\n", filename_html))
+    }
+  }
+}
+
+# Combined take-up survivors table (program / any-training × cc / mi).
+takeup_survivor_panels <- local({
+  out <- list(); k <- 0L
+  for (oc in c("program_takeup", "any_training")) for (ap in c("cc", "mi")) {
+    k <- k + 1L
+    out[[k]] <- list(id = sprintf("(%d)", k), hz = "", oc = oc, approach = ap, dig = 1)
+  }
+  out
+})
+
+# Single-level header: one group label per outcome, spanning its (cc, mi) pair.
+takeup_survivors_header_setup <- function(df) {
+  function(ft) {
+    ncols <- ncol(df)
+    labels <- as.list(setNames(
+      c("", "Program take-up", "", "Any-training take-up", ""), names(df)))
+    ft <- set_header_labels(ft, values = labels)
+    ft <- merge_h_range(ft, i = 1, j1 = 2, j2 = 3, part = "header")
+    ft <- merge_h_range(ft, i = 1, j1 = 4, j2 = 5, part = "header")
+    ft <- bold(ft, j = 2:ncols, part = "header")
+    ft <- align(ft, j = 2:ncols, align = "center", part = "header")
+    ft
+  }
+}
+
+cat("\nBuilding take-up survivors tables...\n")
+for (sm in samples) {
+  cat(sprintf("Take-up survivors: [%s]\n", sm$name))
+  rows <- build_combined_survivors_rows(sm, takeup_survivor_panels, takeup = TRUE)
+  out  <- rows_to_df(rows)
+  caption <- sprintf("Survivor Meta-Regressions, Training Take-up%s",
+                     if (sm$suffix == "") "" else sprintf(" (%s)", sm$name))
+  setup <- takeup_survivors_header_setup(out$df)
+  ft <- style_table(out$df, out$row_types, caption, combined_footer_note,
+                    setup_header = setup)
+  filename <- sprintf("output/table_survivors_takeup%s.rtf", sm$suffix)
+  save_as_rtf(ft, path = filename)
+  cat(sprintf("  RTF: %s\n", filename))
+  ft_h <- style_table(out$df, out$row_types, caption, combined_footer_note,
+                      fontname = "Source Serif 4", setup_header = setup)
+  filename_html <- sprintf("output/table_survivors_takeup%s.html", sm$suffix)
+  writeBin(charToRaw(wrap_html(flextable:::gen_raw_html(ft_h))), filename_html)
+  cat(sprintf("  HTML: %s\n", filename_html))
+}
+
 # ── 9. Descriptive statistics table ──────────────────────────────────────────
 #
 # Sample averages for every trait that appears in the meta-regression tables,
@@ -1009,7 +1163,7 @@ desc_row_defs <- list(
          "census_regionWest"        = "West (%)",
          "geo_typeurban"            = "Urban (%)",
          "geo_typerural"            = "Rural (%)",
-         "UNRATE_PLACEHOLDER"       = "Unemployment at randomization (%)"
+         "UNRATE_PLACEHOLDER"       = "Unemp. at randomization (%)"
        )),
   list(section = "Target population",
        vars = list(
