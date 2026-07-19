@@ -65,7 +65,15 @@ decode_html_entities <- function(x) {
   x <- gsub("&amp;",  "&",  x, fixed = TRUE)
   x
 }
-ie <- as.data.frame(lapply(ie, decode_html_entities), stringsAsFactors = FALSE)
+# Strip leaked `xml:space="preserve">` prefixes (mirrors 01_prep.R) — 40 cells
+# in the `notes` column are affected, which §5 parses for the dollar year.
+strip_xml_leakage <- function(x) {
+  if (!is.character(x)) return(x)
+  trimws(sub('xml:space="preserve">', "", x, fixed = TRUE))
+}
+
+ie <- as.data.frame(lapply(ie, function(x) strip_xml_leakage(decode_html_entities(x))),
+                    stringsAsFactors = FALSE)
 
 cat("Raw Impact Estimates:", nrow(ie), "rows x", ncol(ie), "cols\n")
 

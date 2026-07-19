@@ -58,8 +58,21 @@ decode_html_entities <- function(x) {
   x <- gsub("&amp;",  "&",  x, fixed = TRUE)
   x
 }
-dat       <- as.data.frame(lapply(dat,       decode_html_entities), stringsAsFactors = FALSE)
-reasoning <- as.data.frame(lapply(reasoning, decode_html_entities), stringsAsFactors = FALSE)
+# Some cells carry a leaked `xml:space="preserve">` prefix. Excel emits the
+# whitespace-preserving <t> variant for any string with leading or trailing
+# whitespace; whatever wrote these cells matched a bare "<t>" and so captured
+# the attribute into the text. Strip the prefix and the whitespace that
+# triggered it. Affects only free-text columns (sources, ambiguities_and_flags,
+# notes) — no numeric or join-key column — but clean it so the text is usable.
+strip_xml_leakage <- function(x) {
+  if (!is.character(x)) return(x)
+  trimws(sub('xml:space="preserve">', "", x, fixed = TRUE))
+}
+
+clean_text <- function(x) strip_xml_leakage(decode_html_entities(x))
+
+dat       <- as.data.frame(lapply(dat,       clean_text), stringsAsFactors = FALSE)
+reasoning <- as.data.frame(lapply(reasoning, clean_text), stringsAsFactors = FALSE)
 
 cat("Raw data:", nrow(dat), "rows x", ncol(dat), "cols\n")
 
@@ -1076,3 +1089,8 @@ for (prefix in c("st", "mt", "lt")) {
 saveRDS(dat, "data/processed_data.rds")
 saveRDS(reasoning, "data/reasoning.rds")
 cat("\nSaved data/processed_data.rds and data/reasoning.rds\n")
+
+# Also write a Stata copy of the processed data. Factors become labelled
+# integers; the reference levels set in §10 survive as label order.
+haven::write_dta(dat, "data/processed_data.dta")
+cat("Saved data/processed_data.dta\n")

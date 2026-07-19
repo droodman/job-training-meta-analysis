@@ -38,7 +38,11 @@ make_specs <- function(outcome_type, hz, approach = "cc") {
   # Take-up outcomes are horizon-less: use unemployment at randomization, and a
   # Study-characteristics block with the categorical take-up response-rate flag
   # plus academic (no data-source split, no continuous response rate).
+  # TEMP HACK (2026-07): use unemployment at randomization for ALL outcomes
+  # (emp/earn too), not the horizon-windowed follow-up rate. Revert by
+  # restoring the commented line below.
   un_var <- if (is_takeup) "unrate_at_rand" else paste0("unrate_", hz)
+  # un_var <- "unrate_at_rand"
   spec7 <- if (is_takeup)
     as.formula("~ resprate_label_takeup + academic")
   else
@@ -94,7 +98,10 @@ row_defs <- list(
          "census_regionMidwest"     = "Midwest",
          "census_regionWest"        = "West",
          "geo_typerural"            = "Rural",
+         # TEMP HACK (2026-07): label reflects unrate_at_rand now used in the
+         # emp/earn regressions (see make_specs).
          "UNRATE_PLACEHOLDER"       = "Unemployment over follow-up (%)"
+        #  "UNRATE_PLACEHOLDER"       = "Unemp. at randomization (%)"
        )),
   list(section = "Target population (omitted = welfare or low-income adult)",
        vars = list(
@@ -565,7 +572,9 @@ build_panel_rows <- function(hz, oc_type, oc_label, dig, approach, col_ids, sm) 
   # unemployment at randomization in place of the horizon-windowed rate.
   ds_coef <- if (oc_type == "emp") "emp_data_sourcesurvey" else "earn_data_sourcesurvey"
   rr_coef <- if (is_takeup) "resprate_label_takeup<80%" else paste0("resprate_", oc_type, "_", hz)
+  # TEMP HACK (2026-07): unrate_at_rand for all outcomes (see make_specs).
   un_coef <- if (is_takeup) "unrate_at_rand" else paste0("unrate_", hz)
+  # un_coef <- "unrate_at_rand"
   panel_row_defs <- lapply(row_defs, function(rd) {
     # Drop the data-source row for take-up (no survey/admin split).
     if (is_takeup) rd$vars <- rd$vars[names(rd$vars) != "DATA_SOURCE_PLACEHOLDER"]
@@ -852,7 +861,9 @@ resolve_placeholder_coef <- function(varname, hz, oc_type) {
     return(if (is_takeup) "resprate_label_takeup<80%"
            else paste0("resprate_", oc_type, "_", hz))
   if (varname == "UNRATE_PLACEHOLDER")
+    # TEMP HACK (2026-07): unrate_at_rand for all outcomes.
     return(if (is_takeup) "unrate_at_rand" else paste0("unrate_", hz))
+    # return("unrate_at_rand")
   varname
 }
 
