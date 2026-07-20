@@ -31,6 +31,47 @@ dat$target_pop <- factor(
 # Each column is a separate regression. The last column combines all.
 # Data source moderator switches depending on outcome (emp vs earn).
 
+# Block (8) — persistence — holds at most one moderator: the same outcome's
+# impact at the preceding horizon. Medium-term regressions get the short-term
+# impact, long-term get the medium-term. Short-term has no predecessor, and the
+# take-up outcomes are horizon-less, so for those the block is empty and is
+# dropped from the table rather than shown as a blank column.
+lag_hz <- c(mt = "st", lt = "mt")
+
+lagged_impact_var <- function(outcome_type, hz) {
+  if (outcome_type %in% takeup_outcomes) return(NA_character_)
+  prev <- unname(lag_hz[hz])
+  if (is.na(prev)) return(NA_character_)
+  paste0(prev, "_", outcome_type, "_impact")
+}
+
+has_lag_block <- function(outcome_type, hz) !is.na(lagged_impact_var(outcome_type, hz))
+
+# Group-regression column ids for a panel: the seven standing blocks plus the
+# persistence block where it applies. The survivor column is numbered last.
+panel_group_ids <- function(hz, oc_type)
+  paste0("(", seq_len(if (has_lag_block(oc_type, hz)) 8L else 7L), ")")
+
+# The table ends with the survivor regression(s). Panels carrying the
+# persistence block get two: "static", whose candidates come only from the
+# standing blocks, then "dynamic", which also admits the prior-horizon impact.
+# No header distinguishes them — the persistence row is populated in the
+# dynamic column and blank in the static one, which says it plainly enough.
+# Elsewhere the two would be the same regression, so only one column is shown.
+panel_survivor_modes <- function(hz, oc_type)
+  if (has_lag_block(oc_type, hz)) c("static", "dynamic") else "dynamic"
+
+panel_surv_ids <- function(hz, oc_type) {
+  n <- length(panel_group_ids(hz, oc_type))
+  paste0("(", n + seq_along(panel_survivor_modes(hz, oc_type)), ")")
+}
+
+survivor_source_ids <- function(hz, oc_type, mode) {
+  ids <- panel_group_ids(hz, oc_type)
+  # Persistence is block (1) wherever it is present.
+  if (mode == "static" && has_lag_block(oc_type, hz)) setdiff(ids, "(1)") else ids
+}
+
 make_specs <- function(outcome_type, hz, approach = "cc") {
   is_takeup <- outcome_type %in% takeup_outcomes
   ds_var <- if (outcome_type == "emp") "emp_data_source" else "earn_data_source"
@@ -47,43 +88,54 @@ make_specs <- function(outcome_type, hz, approach = "cc") {
     as.formula("~ resprate_label_takeup + academic")
   else
     as.formula(sprintf("~ %s + %s + academic", ds_var, rr_var))
-  list(
-    "(1)" = list(
+
+  standing <- list(
+    list(
       formula = as.formula(sprintf(
         "~ randomization_midpoint + census_region + geo_type + %s", un_var)),
       label = "Setting"
     ),
-    "(2)" = list(
+    list(
       formula = as.formula("~ target_pop"),
       label = "Target pop."
     ),
-    "(3)" = list(
+    list(
       formula = as.formula(
         "~ pct_male + mean_age + pct_black + pct_hispanic + pct_no_hs_diploma"),
       label = "Demographics"
     ),
-    "(4)" = list(
+    list(
       formula = as.formula(paste0(
         "~ has_classroom + has_ojt + has_jsa + mandatory_voluntary",
         " + treatment_duration_months + cost_per_treated_k + scaled")),
       label = "Treatment"
     ),
-    "(5)" = list(
+    list(
       formula = as.formula(paste0(
         "~ employengage_curricula + jobdev_yes",
         " + employerol_curriculum + employerol_hire")),
       label = "Employer engagement"
     ),
-    "(6)" = list(
+    list(
       formula = as.formula(
         "~ funding_public_private + admin_public_private"),
       label = "Administration"
     ),
-    "(7)" = list(
+    list(
       formula = spec7,
       label = "Study characteristics"
     )
   )
+
+  # Persistence leads when it applies, so the columns are numbered with it
+  # first; where it does not apply the standing blocks keep their usual
+  # (1)-(7) numbering.
+  lag_var <- lagged_impact_var(outcome_type, hz)
+  blocks <- if (is.na(lag_var)) standing else c(
+    list(list(formula = as.formula(paste0("~ ", lag_var)),
+              label = "Persistence")),
+    standing)
+  setNames(blocks, paste0("(", seq_along(blocks), ")"))
 }
 
 # ── 2. Row labels — ordered to match the column specs ────────────────────────
@@ -91,6 +143,12 @@ make_specs <- function(outcome_type, hz, approach = "cc") {
 # and a section header.
 
 row_defs <- list(
+  # Leads the table when it applies; build_panel_rows drops the whole section
+  # for short-term and take-up panels, which have no preceding horizon.
+  list(section = "Persistence",
+       vars = list(
+         "LAGGED_IMPACT_PLACEHOLDER" = "Impact at previous horizon"
+       )),
   list(section = "Setting (omitted = South, urban)",
        vars = list(
          "randomization_midpoint"   = "Randomization year",
@@ -267,6 +325,7 @@ robustify <- function(fit, cluster) {
 }
 
 fit_spec <- function(hz, outcome_type, frm, approach, sample_idx) {
+  if (is.null(frm)) return(NULL)   # empty block (persistence, where absent)
   imp_col <- paste0(col_base(hz, outcome_type), "_impact")
   se_col  <- paste0(col_base(hz, outcome_type), "_se")
   idx <- panel_idx(hz, outcome_type, sample_idx)
@@ -403,15 +462,16 @@ fit_survivor_spec <- function(hz, oc_type, approach, coefs, sample_idx) {
 # (horizon, outcome, approach, sample) panel. Returns the survivor coefficient
 # names and the fitted survivor model — used both by build_panel_rows and by
 # the cross-panel combined survivors table built later.
-compute_survivor_panel <- function(hz, oc_type, approach, sm) {
+compute_survivor_panel <- function(hz, oc_type, approach, sm, mode = "dynamic") {
   specs <- make_specs(oc_type, hz, approach)
-  group_ids <- paste0("(", 1:7, ")")
+  group_ids <- panel_group_ids(hz, oc_type)
   group_fits <- lapply(group_ids, function(cn)
     fit_spec(hz, oc_type, specs[[cn]]$formula, approach, sm$idx))
   names(group_fits) <- group_ids
-  survivors <- unique(unlist(lapply(group_ids, function(cn)
-    get_surviving_coefs(group_fits[[cn]], specs[[cn]]$formula, hz, oc_type,
-                        approach, sm$idx))))
+  survivors <- unique(unlist(lapply(survivor_source_ids(hz, oc_type, mode),
+    function(cn)
+      get_surviving_coefs(group_fits[[cn]], specs[[cn]]$formula, hz, oc_type,
+                          approach, sm$idx))))
   fit <- if (length(survivors) > 0)
     fit_survivor_spec(hz, oc_type, approach, survivors, sm$idx) else NULL
   list(fit = fit, survivors = survivors)
@@ -550,6 +610,14 @@ get_coef_cell <- function(fit, varname, dig, approach) {
   list(coef = coef_str, se = se_str)
 }
 
+# The persistence coefficient is a unitless slope (impact per unit of prior
+# impact), so it needs decimals even in the earnings panels, where every other
+# coefficient is a whole number of 2025 dollars.
+coef_digits <- function(varname, hz, oc_type, dig) {
+  lv <- lagged_impact_var(oc_type, hz)
+  if (!is.na(lv) && identical(varname, lv)) 2L else dig
+}
+
 get_k <- function(fit, approach) {
   if (is.null(fit)) return(NA)
   if (approach == "cc") fit$k else fit$k
@@ -565,8 +633,14 @@ get_R2 <- function(fit, approach) {
 # ── 7. Build tables ──────────────────────────────────────────────────────────
 
 # Build rows for one panel (one outcome × one horizon × one approach)
-build_panel_rows <- function(hz, oc_type, oc_label, dig, approach, col_ids, sm) {
+build_panel_rows <- function(hz, oc_type, oc_label, dig, approach, sm) {
   is_takeup <- oc_type %in% takeup_outcomes
+  # Column ids depend on whether this panel carries the persistence block,
+  # which adds both a block column and a second survivor column.
+  group_ids <- panel_group_ids(hz, oc_type)
+  surv_modes <- panel_survivor_modes(hz, oc_type)
+  surv_ids   <- panel_surv_ids(hz, oc_type)
+  col_ids    <- c(group_ids, surv_ids)
   # Resolve placeholders for this outcome × horizon. Take-up outcomes have no
   # data-source term, a categorical (not continuous) response rate, and use
   # unemployment at randomization in place of the horizon-windowed rate.
@@ -575,7 +649,20 @@ build_panel_rows <- function(hz, oc_type, oc_label, dig, approach, col_ids, sm) 
   # TEMP HACK (2026-07): unrate_at_rand for all outcomes (see make_specs).
   un_coef <- if (is_takeup) "unrate_at_rand" else paste0("unrate_", hz)
   # un_coef <- "unrate_at_rand"
+  lag_coef <- lagged_impact_var(oc_type, hz)
   panel_row_defs <- lapply(row_defs, function(rd) {
+    # Persistence: name the preceding horizon explicitly, or drop the row
+    # (and with it the section) when this panel has no preceding horizon.
+    idx <- which(names(rd$vars) == "LAGGED_IMPACT_PLACEHOLDER")
+    if (length(idx) > 0) {
+      if (is.na(lag_coef)) {
+        rd$vars <- rd$vars[-idx]
+      } else {
+        names(rd$vars)[idx] <- lag_coef
+        rd$vars[[idx]] <- c(st = "Short-term impact",
+                            mt = "Medium-term impact")[[unname(lag_hz[hz])]]
+      }
+    }
     # Drop the data-source row for take-up (no survey/admin split).
     if (is_takeup) rd$vars <- rd$vars[names(rd$vars) != "DATA_SOURCE_PLACEHOLDER"]
     idx <- which(names(rd$vars) == "DATA_SOURCE_PLACEHOLDER")
@@ -597,34 +684,44 @@ build_panel_rows <- function(hz, oc_type, oc_label, dig, approach, col_ids, sm) 
     rd
   })
   specs <- make_specs(oc_type, hz, approach)
-  group_ids <- paste0("(", 1:7, ")")
   fits <- list()
   for (cn in group_ids) {
     fits[[cn]] <- fit_spec(hz, oc_type, specs[[cn]]$formula, approach, sm$idx)
   }
-  # Survivor regression: each surviving coefficient (specific factor level or
-  # continuous regressor) cleared |std beta|>0.1 & p<0.1 in its group fit.
-  survivors <- unique(unlist(lapply(group_ids, function(cn) {
-    get_surviving_coefs(fits[[cn]], specs[[cn]]$formula, hz, oc_type, approach,
-                       sm$idx)
-  })))
-  cat(sprintf("    Survivors (%s/%s/%s): %s\n", oc_type, hz, sm$name,
-              if (length(survivors)) paste(survivors, collapse = ", ") else "(none)"))
-  if (length(survivors) > 0) {
-    fits[["(8)"]] <- fit_survivor_spec(hz, oc_type, approach, survivors, sm$idx)
-    write_corr_matrix(survivors, hz, oc_type, approach, sm$suffix, sm$idx)
-  } else {
-    fits[["(8)"]] <- NULL
+  # Survivor regressions: each surviving coefficient (specific factor level or
+  # continuous regressor) cleared |std beta|>0.1 & p<0.1 in its group fit. The
+  # static column withholds the persistence block from the candidate pool; the
+  # dynamic column admits it.
+  for (j in seq_along(surv_modes)) {
+    mode <- surv_modes[j]
+    survivors <- unique(unlist(lapply(survivor_source_ids(hz, oc_type, mode),
+      function(cn) {
+        get_surviving_coefs(fits[[cn]], specs[[cn]]$formula, hz, oc_type,
+                            approach, sm$idx)
+    })))
+    cat(sprintf("    Survivors (%s/%s/%s/%s): %s\n", oc_type, hz, mode, sm$name,
+                if (length(survivors)) paste(survivors, collapse = ", ") else "(none)"))
+    fits[[surv_ids[j]]] <- if (length(survivors) > 0)
+      fit_survivor_spec(hz, oc_type, approach, survivors, sm$idx) else NULL
+    # Static survivors are a subset of dynamic ones (selection is block-by-block,
+    # so admitting a block can only add candidates). One correlation matrix, on
+    # the widest surviving set, therefore covers both columns.
+    if (mode == tail(surv_modes, 1) && length(survivors) > 0)
+      write_corr_matrix(survivors, hz, oc_type, approach, sm$suffix, sm$idx)
+    # Stash the survivor results so the cross-panel combined table built later
+    # can reuse them without re-running the group regressions.
+    survivor_panel_cache[[paste(sm$suffix, approach, hz, oc_type, mode,
+                                sep = "/")]] <<-
+      list(fit = fits[[surv_ids[j]]], survivors = survivors)
   }
-  # Stash the survivor results so the cross-panel combined table built later
-  # can reuse them without re-running the seven group regressions.
-  survivor_panel_cache[[paste(sm$suffix, approach, hz, oc_type, sep = "/")]] <<-
-    list(fit = fits[["(8)"]], survivors = survivors)
 
   all_rows <- list()
 
   # Moderator rows by section
   for (rd in panel_row_defs) {
+    # A section whose variables were all dropped (persistence, where absent)
+    # contributes no header row.
+    if (length(rd$vars) == 0) next
     sec_row <- c(rd$section, rep("", length(col_ids)))
     names(sec_row) <- c("variable", col_ids)
     all_rows[[length(all_rows) + 1]] <- list(values = sec_row, type = "section")
@@ -634,7 +731,8 @@ build_panel_rows <- function(hz, oc_type, oc_label, dig, approach, col_ids, sm) 
       for (rtype in c("coef", "se")) {
         vals <- c(if (rtype == "coef") sprintf("  %s", display_label) else "")
         for (cn in col_ids) {
-          cell <- get_coef_cell(fits[[cn]], varname, dig, approach)
+          cell <- get_coef_cell(fits[[cn]], varname,
+                                coef_digits(varname, hz, oc_type, dig), approach)
           vals <- c(vals, cell[[rtype]])
         }
         names(vals) <- c("variable", col_ids)
@@ -695,7 +793,7 @@ rows_to_df <- function(all_rows) {
 # default labels columns 1..(ncols-1) blank and the last column "Survivors",
 # as expected by the per-horizon panel tables.
 style_table <- function(df, row_types, caption, footer_note, fontname = NULL,
-                        setup_header = NULL) {
+                        setup_header = NULL, n_surv = 1L) {
   ncols  <- ncol(df)
   n_data <- ncols - 1L
   label_width <- 2.6
@@ -705,10 +803,16 @@ style_table <- function(df, row_types, caption, footer_note, fontname = NULL,
   ft <- flextable(df)
 
   if (is.null(setup_header)) {
-    header_labels <- as.list(setNames(c(rep("", ncols - 1L),
-                                        "Survivors"), names(df)))
+    # The final n_surv columns are survivor regressions. Where there are two
+    # (static, then dynamic) a single "Survivors" label spans the pair — they
+    # are told apart by whether the persistence row carries an estimate.
+    j1 <- ncols - n_surv + 1L
+    header_labels <- as.list(setNames(
+      c(rep("", j1 - 1L), "Survivors", rep("", ncols - j1)), names(df)))
     ft <- set_header_labels(ft, values = header_labels)
-    ft <- bold(ft, j = ncols, part = "header")
+    if (n_surv > 1L)
+      ft <- merge_h_range(ft, i = 1, j1 = j1, j2 = ncols, part = "header")
+    ft <- bold(ft, j = j1:ncols, part = "header")
   } else {
     ft <- setup_header(ft)
   }
@@ -766,7 +870,8 @@ panels <- list(
   list(oc = "earn", label = "Earnings impacts (2025$, annualized)", dig = 0)
 )
 
-col_ids <- c("(1)", "(2)", "(3)", "(4)", "(5)", "(6)", "(7)", "(8)")
+# Panel column ids are derived per panel (see panel_group_ids) because the
+# persistence block is present only for medium- and long-term horizons.
 
 footer_note <- function(approach) {
   paste("Notes: Standard errors in parentheses.",
@@ -786,7 +891,8 @@ samples <- list(
 )
 
 # Filled by build_panel_rows; consumed by the combined-survivors table below.
-# Key: paste(sm$suffix, approach, hz, oc, sep="/")  Value: list(fit, survivors)
+# Key: paste(sm$suffix, approach, hz, oc, mode, sep="/")
+# Value: list(fit, survivors)
 survivor_panel_cache <- list()
 
 for (sm in samples) {
@@ -801,7 +907,7 @@ for (sm in samples) {
       all_rows <- list()
       for (panel in panels) {
         panel_rows <- build_panel_rows(hz, panel$oc, panel$label, panel$dig,
-                                       approach, col_ids, sm)
+                                       approach, sm)
         all_rows <- c(all_rows, panel_rows)
       }
 
@@ -810,7 +916,9 @@ for (sm in samples) {
       caption <- sprintf("Meta-Regression of %s Program Impacts (%s%s)",
                          hz_label, app_label,
                          if (sm$suffix == "") "" else sprintf(", %s", sm$name))
-      ft <- style_table(combined$df, combined$row_types, caption, footer_note(approach))
+      n_surv <- length(panel_survivor_modes(hz, panels[[1]]$oc))
+      ft <- style_table(combined$df, combined$row_types, caption,
+                        footer_note(approach), n_surv = n_surv)
       filename <- sprintf("output/table_%s_%s%s.rtf", hz, approach, sm$suffix)
       save_as_rtf(ft, path = filename)
       cat(sprintf("  RTF: %s\n", filename))
@@ -818,12 +926,13 @@ for (sm in samples) {
       # HTML: separate per-panel tables
       for (panel in panels) {
         panel_rows <- build_panel_rows(hz, panel$oc, panel$label, panel$dig,
-                                       approach, col_ids, sm)
+                                       approach, sm)
         p <- rows_to_df(panel_rows)
         caption_p <- sprintf("%s: %s (%s%s)", hz_label, panel$label, app_label,
                              if (sm$suffix == "") "" else sprintf(", %s", sm$name))
         ft_p <- style_table(p$df, p$row_types, caption_p, footer_note(approach),
-                            fontname = "Source Serif 4")
+                            fontname = "Source Serif 4",
+                            n_surv = length(panel_survivor_modes(hz, panel$oc)))
         filename_html <- sprintf("output/table_%s_%s_%s%s.html",
                                  panel$oc, hz, approach, sm$suffix)
         # Generate HTML directly from flextable's internal method
@@ -853,6 +962,12 @@ for (sm in samples) {
 # names for a given (horizon, outcome).
 resolve_placeholder_coef <- function(varname, hz, oc_type) {
   is_takeup <- oc_type %in% takeup_outcomes
+  if (varname == "LAGGED_IMPACT_PLACEHOLDER") {
+    lv <- lagged_impact_var(oc_type, hz)
+    # The combined table spans mt and lt, so this resolves to a different
+    # column per panel (st_*_impact for mt, mt_*_impact for lt).
+    return(if (is.na(lv)) "__na__" else lv)
+  }
   if (varname == "DATA_SOURCE_PLACEHOLDER")
     return(if (is_takeup) "__na__"        # no data-source term for take-up
            else if (oc_type == "emp") "emp_data_sourcesurvey"
@@ -879,12 +994,13 @@ combined_panels <- local({
 })
 
 build_combined_survivors_rows <- function(sm, panels_spec = combined_panels,
-                                          takeup = FALSE) {
+                                          takeup = FALSE, mode = "dynamic") {
   col_ids <- vapply(panels_spec, `[[`, character(1), "id")
   panel_data <- lapply(panels_spec, function(p) {
-    key <- paste(sm$suffix, p$approach, p$hz, p$oc, sep = "/")
+    key <- paste(sm$suffix, p$approach, p$hz, p$oc, mode, sep = "/")
     cached <- survivor_panel_cache[[key]]
-    if (is.null(cached)) cached <- compute_survivor_panel(p$hz, p$oc, p$approach, sm)
+    if (is.null(cached))
+      cached <- compute_survivor_panel(p$hz, p$oc, p$approach, sm, mode)
     cached
   })
   fits      <- lapply(panel_data, `[[`, "fit")
@@ -921,7 +1037,9 @@ build_combined_survivors_rows <- function(sm, panels_spec = combined_panels,
         for (i in seq_along(panels_spec)) {
           p <- panels_spec[[i]]
           resolved <- resolve_placeholder_coef(varname, p$hz, p$oc)
-          cell <- get_coef_cell(fits[[i]], resolved, p$dig, p$approach)
+          cell <- get_coef_cell(fits[[i]], resolved,
+                                coef_digits(resolved, p$hz, p$oc, p$dig),
+                                p$approach)
           vals <- c(vals, cell[[rtype]])
         }
         names(vals) <- c("variable", col_ids)
@@ -984,8 +1102,12 @@ combined_footer_note <- paste(
   "REML estimates.",
   sprintf("MI columns (✓) pooled across %d imputations via Rubin's rules; remaining columns use complete cases.", m_imp))
 
+# One column per (outcome, horizon, approach) panel, showing that panel's
+# dynamic survivor regression — the fuller of the two, since static survivors
+# are always a subset.
 cat("\nBuilding combined survivors tables...\n")
 for (sm in samples) {
+ {
   cat(sprintf("Combined survivors: [%s]\n", sm$name))
   rows <- build_combined_survivors_rows(sm)
   out  <- rows_to_df(rows)
@@ -1011,6 +1133,7 @@ for (sm in samples) {
     iframe_resize_script, "\n</body>\n</html>\n"))
   writeBin(charToRaw(full_html), filename_html)
   cat(sprintf("  HTML: %s\n", filename_html))
+ }
 }
 
 # ── 8c. Take-up meta-regression tables (standalone) ──────────────────────────
@@ -1042,7 +1165,7 @@ for (sm in samples) {
     all_rows <- list()
     for (panel in takeup_panels)
       all_rows <- c(all_rows, build_panel_rows("", panel$oc, panel$label,
-                                               panel$dig, approach, col_ids, sm))
+                                               panel$dig, approach, sm))
     combined <- rows_to_df(all_rows)
     caption <- sprintf("Meta-Regression of Training Take-up (%s%s)", app_label,
                        if (sm$suffix == "") "" else sprintf(", %s", sm$name))
@@ -1054,7 +1177,7 @@ for (sm in samples) {
     # Separate per-outcome HTML tables
     for (panel in takeup_panels) {
       p <- rows_to_df(build_panel_rows("", panel$oc, panel$label, panel$dig,
-                                       approach, col_ids, sm))
+                                       approach, sm))
       caption_p <- sprintf("%s (%s%s)", panel$label, app_label,
                            if (sm$suffix == "") "" else sprintf(", %s", sm$name))
       ft_p <- style_table(p$df, p$row_types, caption_p, footer_note(approach),

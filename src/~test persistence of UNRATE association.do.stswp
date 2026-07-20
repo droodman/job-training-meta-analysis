@@ -1,12 +1,12 @@
 use "C:\Users\drood\Dropbox\Job training meta-analysis\job-training-meta-analysis\data\processed_data", clear
 
 meta set mt_emp_impact mt_emp_se
-meta regress randomization_midpoint i.census_region i.geo_type unrate_mt
-gen mt_regweight = _meta_regweight
+meta regress randomization_midpoint /*i.census_region i.geo_type*/ unrate_mt
+// gen mt_regweight = _meta_regweight
 
 meta set lt_emp_impact lt_emp_se
 meta regress randomization_midpoint i.census_region i.geo_type unrate_lt
-gen lt_regweight = _meta_regweight
+// gen lt_regweight = _meta_regweight
 
 cmp (mt_emp_impact = randomization_midpoint i.census_region i.geo_type unrate_mt) ///
     (lt_emp_impact = randomization_midpoint i.census_region i.geo_type unrate_lt) [pw = mt_regweight], nolr ind(1 1) qui cluster(project)
