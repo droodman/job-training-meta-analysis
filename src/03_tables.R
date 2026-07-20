@@ -1102,29 +1102,33 @@ combined_footer_note <- paste(
   "REML estimates.",
   sprintf("MI columns (✓) pooled across %d imputations via Rubin's rules; remaining columns use complete cases.", m_imp))
 
-# One column per (outcome, horizon, approach) panel, showing that panel's
-# dynamic survivor regression — the fuller of the two, since static survivors
-# are always a subset.
+# One column per (outcome, horizon, approach) panel. Every panel here is
+# medium- or long-term, so both survivor variants apply and each gets its own
+# table: "static" selects only from the standing blocks, "dynamic" also admits
+# the preceding horizon's impact. (The per-horizon tables in section 8 show the
+# two side by side; here a whole table is already one column per panel, so
+# pairing them within it would double an eight-column table to sixteen.)
 cat("\nBuilding combined survivors tables...\n")
 for (sm in samples) {
- {
-  cat(sprintf("Combined survivors: [%s]\n", sm$name))
-  rows <- build_combined_survivors_rows(sm)
+ for (mode in c("static", "dynamic")) {
+  cat(sprintf("Combined survivors: %s [%s]\n", mode, sm$name))
+  rows <- build_combined_survivors_rows(sm, mode = mode)
   out  <- rows_to_df(rows)
-  caption <- sprintf("Survivor Meta-Regressions, Medium- and Long-Term Outcomes%s",
+  caption <- sprintf("Survivor Meta-Regressions, Medium- and Long-Term Outcomes (%s)%s",
+                     mode,
                      if (sm$suffix == "") "" else sprintf(" (%s)", sm$name))
   setup <- combined_header_setup(out$df)
 
   ft <- style_table(out$df, out$row_types, caption,
                     combined_footer_note, setup_header = setup)
-  filename <- sprintf("output/table_survivors%s.rtf", sm$suffix)
+  filename <- sprintf("output/table_survivors_%s%s.rtf", mode, sm$suffix)
   save_as_rtf(ft, path = filename)
   cat(sprintf("  RTF: %s\n", filename))
 
   ft_h <- style_table(out$df, out$row_types, caption,
                       combined_footer_note, fontname = "Source Serif 4",
                       setup_header = setup)
-  filename_html <- sprintf("output/table_survivors%s.html", sm$suffix)
+  filename_html <- sprintf("output/table_survivors_%s%s.html", mode, sm$suffix)
   html_body <- flextable:::gen_raw_html(ft_h)
   full_html <- enc2utf8(paste0(
     "<!DOCTYPE html>\n<html>\n<head><meta charset='UTF-8'>\n",

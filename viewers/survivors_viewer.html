@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Survivor Meta-Regressions</title>
+<style>
+  body { font-family: "Segoe UI", Arial, sans-serif; margin: 20px; background: #fff; }
+  h1 { font-family: "Styrene B", sans-serif; font-size: 1.4em; margin-bottom: 10px; }
+  .controls { font-family: "Styrene B", sans-serif; }
+  .layout { display: flex; gap: 20px; align-items: flex-start; }
+  .controls { display: flex; flex-direction: column; gap: 14px;
+              padding: 12px 16px; min-width: 210px; position: sticky; top: 20px; }
+  .control-group { display: flex; flex-direction: column; gap: 2px; }
+  .control-group .group-label { font-size: 0.8em; font-weight: 600; color: #555;
+                          text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px; }
+  .control-group label { font-size: 0.9em; cursor: pointer; }
+  .control-group input[type=radio] { margin-right: 4px; }
+  /* A control group whose setting does not apply to the current selection. */
+  .control-group.disabled .group-label,
+  .control-group.disabled label { color: #bbb; cursor: default; }
+  .table-container { flex: 1; }
+  .table-container iframe { border: none; width: 100%; display: block;
+                            overflow: hidden; }
+  #tableFrame { height: 600px; }
+  .filename { font-size: 0.85em; color: #888; margin-top: 6px; }
+  .note { font-size: 0.8em; color: #666; margin: 0 0 14px 0; max-width: 60em; }
+</style>
+</head>
+<body>
+<h1>Survivor Meta-Regression Viewer</h1>
+<p class="note">Each column is the survivor regression for one panel: the
+moderators that cleared |standardized&nbsp;&beta;|&nbsp;&gt;&nbsp;0.1 and
+p&nbsp;&lt;&nbsp;0.1 in their own block regression. A row appears if it survived
+in at least one column.</p>
+<div class="layout">
+<div class="controls">
+  <div class="control-group">
+    <div class="group-label">Outcomes</div>
+    <label><input type="radio" name="outcomes" value="" checked> Employment &amp; earnings</label>
+    <label><input type="radio" name="outcomes" value="_takeup"> Training take-up</label>
+  </div>
+  <div class="control-group" id="modeGroup">
+    <div class="group-label">Survivor selection</div>
+    <label><input type="radio" name="mode" value="_static" checked> Static</label>
+    <label><input type="radio" name="mode" value="_dynamic"> Dynamic</label>
+  </div>
+  <div class="control-group">
+    <div class="group-label">Sample</div>
+    <label><input type="radio" name="sample" value="" checked> Full sample</label>
+    <label><input type="radio" name="sample" value="_primary"> Training is primary in intervention</label>
+  </div>
+</div>
+<div class="table-container">
+  <iframe id="tableFrame" src="" scrolling="no"></iframe>
+  <div class="filename" id="filename"></div>
+</div>
+</div>
+<script>
+function getRadio(name) {
+  return document.querySelector(`input[name="${name}"]:checked`).value;
+}
+
+// The table HTMLs post their rendered height to us via postMessage; we size the
+// iframe to fit so there is no inner scrollbar. The scroll position is captured
+// before the swap and restored once the new pane reports its height, so the
+// user stays put when switching.
+let pendingResize = false;
+let pendingScrollY = 0;
+
+window.addEventListener('message', (e) => {
+  if (!e.data || e.data.type !== 'iframeHeight') return;
+  const frame = document.getElementById('tableFrame');
+  if (e.source !== frame.contentWindow) return;
+  frame.style.height = e.data.height + 'px';
+  if (!pendingResize) return;
+  pendingResize = false;
+  const target = pendingScrollY;
+  // Two rAFs: let layout flush, then beat the browser's scroll anchoring.
+  requestAnimationFrame(() =>
+    requestAnimationFrame(() => window.scrollTo(0, target)));
+});
+
+// Setting `iframe.src` adds a parent-page history entry per radio click, so
+// Back would walk through old settings instead of leaving the viewer.
+// `contentWindow.location.replace(url)` swaps the document without one.
+function navigateFrame(frame, url) {
+  try {
+    frame.contentWindow.location.replace(url);
+  } catch (e) {
+    frame.src = url;
+  }
+}
+
+function update() {
+  const oc = getRadio('outcomes');
+  const sm = getRadio('sample');
+  // Take-up outcomes are horizon-less, so they carry no persistence block and
+  // the static/dynamic distinction does not arise; that control is disabled
+  // and drops out of the filename while take-up is selected.
+  const isTakeup = (oc === '_takeup');
+  const md = isTakeup ? '' : getRadio('mode');
+  document.getElementById('modeGroup').classList.toggle('disabled', isTakeup);
+  document.querySelectorAll('input[name="mode"]').forEach(r => r.disabled = isTakeup);
+
+  const fn = `table_survivors${oc}${md}${sm}.html`;
+
+  pendingScrollY = window.scrollY;
+  pendingResize = true;
+
+  navigateFrame(document.getElementById('tableFrame'), '../output/' + fn);
+  document.getElementById('filename').textContent = fn;
+}
+document.querySelectorAll('input[type=radio]').forEach(r => r.addEventListener('change', update));
+update();
+</script>
+</body>
+</html>
