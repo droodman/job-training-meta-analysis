@@ -36,7 +36,7 @@ options(error = function() {
 
 library(openxlsx)
 
-XLSX <- "data/extraction_full_v62.xlsx"
+XLSX <- "data/extraction_full_v69.xlsx"
 ie <- read.xlsx(XLSX, sheet = "Impact Estimates")
 
 # ── 1. Decode HTML entities (mirrors 01_prep.R) ───────────────────────────────
@@ -89,7 +89,7 @@ join_cols <- c(
   "randomization_midpoint", "target_pop",
   "training_role", "mandatory_voluntary", "scaled",
   "census_region", "geo_type",
-  "cost_per_treated", "cost_per_treated_k"
+  "net_cost_narrow", "net_cost_narrow_k"
 )
 join_cols <- intersect(join_cols, names(dat))
 ie <- merge(ie, dat[, join_cols],

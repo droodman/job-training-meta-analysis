@@ -24,8 +24,8 @@ library(openxlsx)
 # Using openxlsx rather than readxl: readxl returns NA when a formula cell
 # has no cached value, which has bitten us before.
 
-dat <- read.xlsx("data/extraction_full_v62.xlsx", sheet = "Data Table")
-reasoning <- read.xlsx("data/extraction_full_v62.xlsx", sheet = "Reasoning Table")
+dat <- read.xlsx("data/extraction_full_v69.xlsx", sheet = "Data Table")
+reasoning <- read.xlsx("data/extraction_full_v69.xlsx", sheet = "Reasoning Table")
 
 # openxlsx does not auto-decode XML/HTML entities — strings like "PACE &#8211;
 # Year Up" or "GAIN Education &amp; Training" arrive with the entity literals
@@ -492,7 +492,7 @@ dat$measured_earn_impact <- ifelse(
 cat(sprintf("Measured earnings impact (2025$, summed across populated horizons): %d rows non-NA\n",
             sum(!is.na(dat$measured_earn_impact))))
 
-# Rescale cost_per_treated and benefit_per_treated to a per-T-assignee basis
+# Rescale cost_per_treated (deprecated), net_cost_broad, net_cost_narrow, and benefit_per_treated to a per-T-assignee basis
 # for rows whose source reports them per person actually enrolled in training.
 # per_assigned = per_enrolled * (take-up_T / 100), where take-up_T is the
 # percentage of the treatment group that took up training =
@@ -511,8 +511,9 @@ takeup_t_frac <- (dat$program_takeup_control_mean +
                   dat$program_takeup_impact) / 100
 
 cost_mask <- rescale_to_assigned & !is.na(dat$cost_per_treated)
-dat$cost_per_treated[cost_mask] <-
-  dat$cost_per_treated[cost_mask] * takeup_t_frac[cost_mask]
+dat$cost_per_treated[cost_mask] <- dat$cost_per_treated[cost_mask] * takeup_t_frac[cost_mask]
+dat$net_cost_broad  [cost_mask] <- dat$net_cost_broad  [cost_mask] * takeup_t_frac[cost_mask]
+dat$net_cost_narrow [cost_mask] <- dat$net_cost_narrow [cost_mask] * takeup_t_frac[cost_mask]
 cat(sprintf("Cost: %d T-enrolled rows rescaled to per-T-assignee basis\n",
             sum(cost_mask)))
 
@@ -533,8 +534,10 @@ dat$cost_cpi_factor <- sapply(dat$randomization_midpoint, function(yr) {
 })
 cost_has_factor <- !is.na(dat$cost_cpi_factor) & !is.na(dat$cost_per_treated)
 cost_n_missing  <- sum(!is.na(dat$cost_per_treated) & is.na(dat$cost_cpi_factor))
-dat$cost_per_treated[cost_has_factor] <-
-  dat$cost_per_treated[cost_has_factor] * dat$cost_cpi_factor[cost_has_factor]
+dat$cost_per_treated[cost_has_factor] <- dat$cost_per_treated[cost_has_factor] * dat$cost_cpi_factor[cost_has_factor]
+dat$net_cost_broad  [cost_has_factor] <- dat$net_cost_broad  [cost_has_factor] * dat$cost_cpi_factor[cost_has_factor]
+dat$net_cost_narrow [cost_has_factor] <- dat$net_cost_narrow [cost_has_factor] * dat$cost_cpi_factor[cost_has_factor]
+
 cat(sprintf("Cost: %d inflation-adjusted to 2025$, %d missing dollar-year\n",
             sum(cost_has_factor), cost_n_missing))
 
@@ -985,6 +988,8 @@ print(summary(dat[, c("unrate_st", "unrate_mt", "unrate_lt",
 # ── 9. Rescale continuous moderators ─────────────────────────────────────────
 
 dat$cost_per_treated_k <- dat$cost_per_treated / 1000  # 2025$ thousands
+dat$net_cost_broad_k  <- dat$net_cost_broad  / 1000  # 2025$ thousands
+dat$net_cost_narrow_k <- dat$net_cost_narrow / 1000  # 2025$ thousands
 
 # ── 10. Set reference levels for categorical moderators ──────────────────────
 

@@ -89,7 +89,7 @@ for (col in grep("^resprate_label_(emp|earn)_(st|mt|lt)$",
 }
 
 dat$cost_info_label <- factor(
-  ifelse(!is.na(dat$cost_per_treated), "Available", "Missing"),
+  ifelse(!is.na(dat$net_cost_narrow), "Available", "Missing"),
   levels = c("Available", "Missing"))
 
 # ── 2. Subgroup specs (same order as 02f) ────────────────────────────────────

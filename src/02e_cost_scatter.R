@@ -49,14 +49,14 @@ scatters <- list(
 
 make_scatter <- function(dat, sp, sm) {
   d <- sm$filter(dat)
-  idx <- which(!is.na(d[[sp$imp]]) & !is.na(d$cost_per_treated_k))
+  idx <- which(!is.na(d[[sp$imp]]) & !is.na(d$net_cost_narrow_k))
   if (length(idx) < 3) {
     cat(sprintf("  Skipping %s/%s %s — too few observations\n",
                 sp$oc, sp$hz, sm$name))
     return(invisible(NULL))
   }
   d <- d[idx, ]
-  x <- d$cost_per_treated_k
+  x <- d$net_cost_narrow_k
   y <- d[[sp$imp]]
 
   filename <- sprintf("output/scatter_%s_%s_cost%s.png",
@@ -90,7 +90,7 @@ for (sm in samples) {
 }
 
 # ── Benefit vs cost scatter ──────────────────────────────────────────────────
-# Both cost_per_treated and benefit_per_treated are inflation-adjusted to
+# Both net_cost_narrow and benefit_per_treated are inflation-adjusted to
 # 2025$ in 01_prep.R (using the randomization-midpoint dollar year).
 #
 # Edit `labeled_short_names` to control which points are labelled.
@@ -117,9 +117,9 @@ labeled_short_names <- c(
 )
 
 make_benefit_cost_scatter <- function(dat, labeled) {
-  idx <- which(!is.na(dat$cost_per_treated) & !is.na(dat$benefit_per_treated))
+  idx <- which(!is.na(dat$net_cost_narrow) & !is.na(dat$benefit_per_treated))
   d <- dat[idx, ]
-  x <- d$cost_per_treated / 1000      # 2025$ thousands
+  x <- d$net_cost_narrow / 1000      # 2025$ thousands
   y <- d$benefit_per_treated / 1000   # 2025$ thousands
   primary <- !is.na(d$training_role) & d$training_role == "primary"
 
@@ -169,9 +169,9 @@ make_benefit_cost_scatter(dat, labeled_short_names)
 # / extrapolated cost-benefit accounting figure.
 
 make_measured_cost_scatter <- function(dat, labeled) {
-  idx <- which(!is.na(dat$cost_per_treated) & !is.na(dat$measured_earn_impact))
+  idx <- which(!is.na(dat$net_cost_narrow) & !is.na(dat$measured_earn_impact))
   d <- dat[idx, ]
-  x <- d$cost_per_treated / 1000          # 2025$ thousands
+  x <- d$net_cost_narrow / 1000          # 2025$ thousands
   y <- d$measured_earn_impact / 1000      # 2025$ thousands
   primary <- !is.na(d$training_role) & d$training_role == "primary"
 

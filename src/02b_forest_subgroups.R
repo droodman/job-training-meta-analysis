@@ -86,7 +86,7 @@ dat$employengage_curricula_label <- factor(
              "Employers not engaged in curriculum design"))
 
 dat$cost_info_label <- factor(
-  ifelse(!is.na(dat$cost_per_treated),
+  ifelse(!is.na(dat$net_cost_narrow),
          "Cost info available", "Cost info missing"),
   levels = c("Cost info available", "Cost info missing"))
 

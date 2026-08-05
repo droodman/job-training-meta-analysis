@@ -220,10 +220,10 @@ for (lab in c("MT emp", "LT emp", "MT earn", "LT earn")) {
 
 cat("\n=== Chunk 4: Overview — $13,046 per treatment group member ===\n")
 
-cost_unwt_prim <- mean(dat$cost_per_treated[primary_idx], na.rm = TRUE)
+cost_unwt_prim <- mean(dat$net_cost_narrow[primary_idx], na.rm = TRUE)
 prim_projects      <- unique(dat$project[primary_idx])
 prim_cost_projects <- unique(dat$project[primary_idx][
-                        !is.na(dat$cost_per_treated[primary_idx])])
+                        !is.na(dat$net_cost_narrow[primary_idx])])
 cov_pct <- 100 * length(prim_cost_projects) / length(prim_projects)
 
 report(
@@ -231,7 +231,7 @@ report(
   "cost coverage ≈ 67% of training-primary studies; unweighted mean cost = $13,046",
   sprintf("cost coverage = %d/%d projects = %.1f%%; mean cost = $%.0f (n = %d rows)",
           length(prim_cost_projects), length(prim_projects), cov_pct,
-          cost_unwt_prim, sum(!is.na(dat$cost_per_treated[primary_idx]))))
+          cost_unwt_prim, sum(!is.na(dat$net_cost_narrow[primary_idx]))))
 
 ###############################################################################
 # CHUNK 5.  Overview — JTPA impacts for low-income adults
@@ -424,7 +424,7 @@ trait_check <- list(
   "classroom training (% of prim)"   = pct(dat$has_classroom[primary_idx]),
   "on-the-job training (% of prim)"  = pct(dat$has_ojt[primary_idx]),
   "treatment duration months (prim)" = mean(dat$treatment_duration_months[primary_idx], na.rm = TRUE),
-  "cost per treated (prim, 2025$)"   = mean(dat$cost_per_treated[primary_idx], na.rm = TRUE),
+  "cost per treated (prim, 2025$)"   = mean(dat$net_cost_narrow[primary_idx], na.rm = TRUE),
   "funding public (% of prim)"       = pct_eq(dat$funding_public_private[primary_idx], "public"),
   "admin private (% of prim)"        = pct_eq(dat$admin_public_private[primary_idx], "private")
 )
@@ -633,7 +633,7 @@ mt_emp_sec  <- remi(sec_idx, "mt_emp_impact",  "mt_emp_se")
 lt_emp_sec  <- remi(sec_idx, "lt_emp_impact",  "lt_emp_se")
 mt_earn_sec <- remi(sec_idx, "mt_earn_impact", "mt_earn_se")
 lt_earn_sec <- remi(sec_idx, "lt_earn_impact", "lt_earn_se")
-sec_cost    <- mean(dat$cost_per_treated[sec_idx], na.rm = TRUE)
+sec_cost    <- mean(dat$net_cost_narrow[sec_idx], na.rm = TRUE)
 sec_prog_diff <- remi(sec_idx, "program_takeup_impact", "program_takeup_se")
 sec_any_diff  <- remi(sec_idx, "any_training_impact",   "any_training_se")
 
@@ -650,7 +650,7 @@ report(
   "Sector cost $11,677 per treatment group member; take-up differential 56 pts; any-training ~25%",
   "sector cost ~$11,677; program take-up differential ~56; any-training differential ~25",
   sprintf("cost = $%.0f (n=%d); program take-up differential = %.1f; any-training differential = %.1f",
-          sec_cost, sum(!is.na(dat$cost_per_treated[sec_idx])),
+          sec_cost, sum(!is.na(dat$net_cost_narrow[sec_idx])),
           sec_prog_diff["mean"], sec_any_diff["mean"]))
 
 ###############################################################################
@@ -689,7 +689,7 @@ report(
   "PACE Year Up LT earn ~$8-10K; cost ~$30K",
   sprintf("Year Up (PACE, 8 offices): LT earn = $%.0f; lt_followup_years = %s; cost = $%.0f",
           yu_lt, format(dat$lt_followup_years[yu_idx]),
-          dat$cost_per_treated[yu_idx]))
+          dat$net_cost_narrow[yu_idx]))
 
 ###############################################################################
 # CHUNK 18.  §7 — sector earnings impacts 3–4× the average training program
@@ -730,3 +730,9 @@ report(
 cat("\n##############################################################################\n")
 cat("# Verification script complete.\n")
 cat("##############################################################################\n")
+
+# hand-coded: average deviation of net_cost_broad from net_cost_narrow, for rows where both are non-missing and different
+dat <- read.xlsx("data/extraction_full_v69.xlsx", sheet = "Data Table")
+comparators = !is.na(dat$net_cost_narrow) & !is.na(dat$net_cost_broad) & dat$net_cost_narrow!= dat$net_cost_broad
+mean(dat$net_cost_broad[comparators] / dat$net_cost_narrow[comparators]) - 1
+# unique(dat$short_name[comparators & dat$net_cost_narrow < dat$net_cost_broad])

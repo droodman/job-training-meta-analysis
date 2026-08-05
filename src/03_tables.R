@@ -107,7 +107,7 @@ make_specs <- function(outcome_type, hz, approach = "cc") {
     list(
       formula = as.formula(paste0(
         "~ has_classroom + has_ojt + has_jsa + mandatory_voluntary",
-        " + treatment_duration_months + cost_per_treated_k + scaled")),
+        " + treatment_duration_months + net_cost_narrow + scaled")),
       label = "Treatment"
     ),
     list(
@@ -185,7 +185,7 @@ row_defs <- list(
          "has_jsa"                   = "Job search assistance",
          "mandatory_voluntaryvoluntary"  = "Voluntary",
          "treatment_duration_months" = "Treatment duration (months)",
-         "cost_per_treated_k"        = "Cost per treated ($1,000s)",
+         "net_cost_narrow"        = "Cost per treated ($1,000s)",
          "scaled"                    = "Scaled"
        )),
   list(section = "Employer engagement",
@@ -214,7 +214,7 @@ row_defs <- list(
 
 imp_vars <- c(
   "mean_age", "pct_male", "pct_white", "pct_black", "pct_hispanic",
-  "pct_no_hs_diploma", "cost_per_treated_k",
+  "pct_no_hs_diploma", "net_cost_narrow",
   "has_classroom", "has_ojt", "has_jsa",
   "training_role", "mandatory_voluntary",
   "funding_public_private", "admin_public_private",
@@ -1269,8 +1269,8 @@ descriptive_value <- function(varname, subset_idx) {
     return(ms(dat$resprate_emp_st[subset_idx]))
   if (varname == "UNRATE_PLACEHOLDER")
     return(ms(dat$unrate_at_rand[subset_idx]))
-  if (varname == "cost_per_treated_k")
-    return(ms(dat$cost_per_treated_k[subset_idx] * 1000))
+  if (varname == "net_cost_narrow")
+    return(ms(dat$net_cost_narrow[subset_idx] * 1000))
   if (varname %in% names(dat)) {
     x <- dat[[varname]][subset_idx]
     if (is.factor(x) || is.character(x)) return(na_pair)
@@ -1328,7 +1328,7 @@ desc_row_defs <- list(
          "has_jsa"                      = "Job search assistance (%)",
          "mandatory_voluntarymandatory" = "Mandatory (%)",
          "treatment_duration_months"    = "Treatment duration (months)",
-         "cost_per_treated_k"           = "Cost per treated (2025 $)",
+         "net_cost_narrow"           = "Cost per treated (2025 $)",
          "scaled"                       = "Scaled (%)"
        )),
   list(section = "Employer engagement",
@@ -1456,8 +1456,8 @@ descriptive_sw_value <- function(varname, subset_idx) {
   if (varname == "TARGETPOP_WELFARE_OR_LIA")
     return(ms(as.numeric(dat$target_pop[subset_idx] %in%
                          c("welfare", "low_income_adult"))))
-  if (varname == "cost_per_treated_k")
-    return(ms(dat$cost_per_treated_k[subset_idx] * 1000))
+  if (varname == "net_cost_narrow")
+    return(ms(dat$net_cost_narrow[subset_idx] * 1000))
   if (varname %in% names(dat)) {
     x <- dat[[varname]][subset_idx]
     if (is.factor(x) || is.character(x)) return(na_pair)
