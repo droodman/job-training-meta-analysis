@@ -1270,7 +1270,7 @@ descriptive_value <- function(varname, subset_idx) {
   if (varname == "UNRATE_PLACEHOLDER")
     return(ms(dat$unrate_at_rand[subset_idx]))
   if (varname == "net_cost_narrow")
-    return(ms(dat$net_cost_narrow[subset_idx] * 1000))
+    return(ms(dat$net_cost_narrow[subset_idx]))
   if (varname %in% names(dat)) {
     x <- dat[[varname]][subset_idx]
     if (is.factor(x) || is.character(x)) return(na_pair)
@@ -1457,7 +1457,7 @@ descriptive_sw_value <- function(varname, subset_idx) {
     return(ms(as.numeric(dat$target_pop[subset_idx] %in%
                          c("welfare", "low_income_adult"))))
   if (varname == "net_cost_narrow")
-    return(ms(dat$net_cost_narrow[subset_idx] * 1000))
+    return(ms(dat$net_cost_narrow[subset_idx]))
   if (varname %in% names(dat)) {
     x <- dat[[varname]][subset_idx]
     if (is.factor(x) || is.character(x)) return(na_pair)
