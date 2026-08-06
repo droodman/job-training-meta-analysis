@@ -39,4 +39,7 @@ source("src/02f_estimates_scatter.R")
 cat("\n====== 03_tables.R ======\n")
 source("src/03_tables.R")
 
+cat("\n====== 05_benefit_cost_inputs.R ======\n")
+source("src/05_benefit_cost_inputs.R")
+
 cat("\n====== All steps complete. ======\n")
