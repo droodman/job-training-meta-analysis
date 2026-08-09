@@ -52,13 +52,31 @@ plain_mean <- function(x_col) {
 # is the "reduced other training" adjustment, expressed as a fraction of
 # net_cost_narrow. Mean of ratios (not ratio of means) because studies with
 # small narrow costs represent proportionally large adjustments. Rows where
-# narrow == broad are excluded rather than treated as a true zero adjustment
-# — that equality usually just reflects missing cost-breakdown information.
+# narrow == broad are excluded from the estimation sample rather than
+# treated as a true zero adjustment — that equality usually just reflects
+# missing cost-breakdown information, not a genuine finding of no adjustment.
+#
+# Those excluded rows (plus any row missing net_cost_broad entirely) get an
+# imputed net_cost_broad = narrow * (1 + rate), then the ratio stat is
+# recomputed over the full narrow-available set, real values and imputed
+# values together. (This necessarily reproduces `rate` itself — imputing
+# with the estimation sample's own mean ratio cannot move that mean — but
+# the recomputation is kept explicit because it's the actual mechanism, and
+# it leaves `broad_imputed` available if a row-level broad figure is needed
+# elsewhere.)
 cost_adjustment <- function(idx) {
   narrow <- dat$net_cost_narrow[idx]
   broad  <- dat$net_cost_broad[idx]
-  ok <- !is.na(narrow) & !is.na(broad) & narrow != broad
-  mean(broad[ok] / narrow[ok]) - 1
+  has_narrow <- !is.na(narrow)
+  used <- has_narrow & !is.na(broad) & narrow != broad
+
+  rate <- mean(broad[used] / narrow[used]) - 1
+
+  broad_imputed <- broad
+  impute_me <- has_narrow & !used
+  broad_imputed[impute_me] <- narrow[impute_me] * (1 + rate)
+
+  mean(broad_imputed[has_narrow] / narrow[has_narrow]) - 1
 }
 
 results <- rbind(
