@@ -12,4 +12,4 @@ This is an in-progress meta-analysis of randomized evaluations of job training p
 
 Most data extraction done by Claude, under supervision. "Claude is AI and can make mistakes."
 
-[Github repo])https://github.com/droodman/job-training-meta-analysis)
+[Github repo](https://github.com/droodman/job-training-meta-analysis)
