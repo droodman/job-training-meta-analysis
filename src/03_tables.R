@@ -1691,7 +1691,7 @@ write_desc_table(
   basename = "table_outcomes",
   caption  = "Control groups means and impact estimates in U.S.-based job training experiments",
   footer   = paste(
-    'Notes: Impacts are estimated with random-effects maximum likelihood (REML) meta-analysis. Control-group statistics are com-puted using the corresponding REML weights. Figures in parentheses below each estimate are standard deviations of control-group values and standard errors of impact estimates. Sample sizes vary because of missing data. Short-term outcomes have a ~1-year fol-low-up, medium-term ~2 years, and long-term ~3-5 years.'),
+    'Notes: Impacts are estimated with random-effects maximum likelihood (REML) meta-analysis. Control-group statistics are computed using the corresponding REML weights. Figures in parentheses below each estimate are standard deviations of control-group values and standard errors of impact estimates. Sample sizes vary because of missing data. Short-term outcomes have a ~1-year fol-low-up, medium-term ~2 years, and long-term ~3-5 years.'),
   header_fn = apply_desc_headers_stacked)
 
 cat("\nAll tables written.\n")

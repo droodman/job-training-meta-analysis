@@ -3,7 +3,7 @@
 # on this meta-analysis data set.
 #
 # Source document (as of this re-sync):
-#   doc/Subsidized Job Training evidence review.txt
+#   doc/Subsidized Job Training evidence review 2.txt
 #
 # Each chunk:
 #   1. Prints the verbatim claim from the write-up
@@ -14,9 +14,14 @@
 #   - Where a claim gives a pair of numbers "for all programs and training-
 #     primary ones," the first is the full sample and the second the
 #     training-primary subsample (training_role == "primary").
-#   - The executive summary now leads with single headline numbers; these
-#     track the training-primary long-term column, so each exec-summary chunk
-#     reports both full and training-primary for context.
+#   - Section numbers below refer to the "2" revision: the old "Executive
+#     summary" was folded into an unnumbered lead-in and findings 1.1-1.7; the
+#     old meta-analysis section §6.6 is now §6.5, with subsections renumbered
+#     to match (§6.5.1 sample, §6.5.2 average impacts, §6.5.3 benefit-cost,
+#     §6.5.4 correlates, §6.5.5 summary). Table numbers each shifted down by
+#     1 (old Table 2 study-traits -> new Table 1, ... old Table 7 sector
+#     impacts -> new Table 6); figure numbers for the sector-program plots
+#     shifted down by 3 (old Figure 15/16/17 -> new Figure 12/13/14).
 #   - When the write-up says "long-term" / "years 3-5," it means horizon
 #     "lt"; "medium term" / "year 2" is "mt"; "short term" / "year 1" is "st".
 #   - Impact and control-group statistics use REML meta-analysis with
@@ -104,17 +109,19 @@ cat("# Verification of numeric claims in Subsidized Job Training evidence review
 cat("##############################################################################\n")
 
 ###############################################################################
-# CHUNK 1.  Executive summary — average impacts are small
+# CHUNK 1.  Table 2 (§6.5.2) — LT control-group base rates
 #
-#   "They increase employment by 1.7 percentage points, over a control group
-#   average of 63%, and $800/year more pay, against a control group average of
-#   $16K (in 2025 $). These figures are per person offered treatment..."
-#
-# The exec-summary headline numbers track the training-primary long-term
-# column; both full and training-primary are shown for context.
+# The old write-up had an executive-summary sentence combining headline
+# impact and control-base numbers ("They increase employment by 1.7
+# percentage points, over a control group average of 63%, and $800/year more
+# pay, against a control group average of $16K..."). That sentence was
+# removed in the revision; the headline LT impact numbers now surface only
+# via §1.1 and §8 (see Chunks 3 and 19). This chunk is kept to verify the LT
+# control-group base rates, which still appear as data in Table 2 even
+# though no single sentence quotes them together anymore.
 ###############################################################################
 
-cat("\n=== Chunk 1: Executive summary — 'Average impacts are small' ===\n")
+cat("\n=== Chunk 1: Table 2 (§6.5.2) — LT control-group base rates ===\n")
 
 lt_emp_full <- remi(all_idx,     "lt_emp_impact",      "lt_emp_se")
 lt_emp_prim <- remi(primary_idx, "lt_emp_impact",      "lt_emp_se")
@@ -126,19 +133,8 @@ lt_earn_cm_full <- remi(all_idx,     "lt_earn_control_mean", "lt_earn_se")
 lt_earn_cm_prim <- remi(primary_idx, "lt_earn_control_mean", "lt_earn_se")
 
 report(
-  "increase employment by 1.7 pts ... and $800/year more pay",
-  "LT emp impact ~1.7; LT earn ~$800 (headline = training-primary column)",
-  sprintf("LT emp impact: full = %.2f, training-primary = %.2f; LT earn: full = %.0f, training-primary = %.0f",
-          lt_emp_full["mean"], lt_emp_prim["mean"],
-          lt_earn_full["mean"], lt_earn_prim["mean"]))
-show_re("LT employment, full",            lt_emp_full)
-show_re("LT employment, training-primary", lt_emp_prim)
-show_re("LT earnings, full",              lt_earn_full)
-show_re("LT earnings, training-primary",   lt_earn_prim)
-
-report(
-  "over a control group average of 63% ... against a control group average of $16K",
-  "LT emp control ~63%; LT earn control ~$16K (headline = training-primary)",
+  "[context, no longer quoted directly] Table 2 LT control-group base rates",
+  "LT emp control ~59-63%; LT earn control ~$14-16K (full / training-primary)",
   sprintf("LT emp control: full = %.1f%%, training-primary = %.1f%%; LT earn control: full = $%.0f, training-primary = $%.0f",
           lt_emp_cm_full["mean"], lt_emp_cm_prim["mean"],
           lt_earn_cm_full["mean"], lt_earn_cm_prim["mean"]))
@@ -148,7 +144,7 @@ show_re("LT earnings control, full",              lt_earn_cm_full)
 show_re("LT earnings control, training-primary",   lt_earn_cm_prim)
 
 ###############################################################################
-# CHUNK 2.  Executive summary — sector programs lift pay by $5–10K/year
+# CHUNK 2.  Lead-in bullets — sector programs lift pay by $5–10K/year
 #
 #   "A few programs have lifted pay $5–10K/year by intensively screening
 #   applicants, involving employers in deciding what to teach, and tracking
@@ -158,7 +154,7 @@ show_re("LT earnings control, training-primary",   lt_earn_cm_prim)
 # is Year Up (8 PACE offices pooled). Both are long-term earnings impacts.
 ###############################################################################
 
-cat("\n=== Chunk 2: Executive summary — sector programs $5-10K/year ===\n")
+cat("\n=== Chunk 2: Lead-in bullets — sector programs $5-10K/year ===\n")
 
 # Per Scholas (Bronx), WorkAdvance — the longer-follow-up Per Scholas row.
 ps_idx <- which(dat$project == "WorkAdvance" &
@@ -182,7 +178,8 @@ report(
 #   by an average 2.8 percentage points in the second year after randomized
 #   assignment to treatment, and 1.7 points in years 3–5. The parallel impacts
 #   on pre-tax earnings are $1,139 and $791 per year (in 2025 dollars). All
-#   these averages are highly significant, statistically."  (See Table 2, §6.6.)
+#   these averages are highly significant, statistically."  (See Table 2 in
+#   §6.5.2; this is now §1.1's lead finding.)
 ###############################################################################
 
 cat("\n=== Chunk 3: Overview — training-primary averages ===\n")
@@ -209,16 +206,24 @@ for (lab in c("MT emp", "LT emp", "MT earn", "LT earn")) {
 }
 
 ###############################################################################
-# CHUNK 4.  Overview — cost per treatment group member
+# CHUNK 4.  §1.2 — cost per treatment group member
 #
 #   "Among the 67% of training-primary interventions whose write-ups include
-#   cost information, costs average $13,046 per treatment group member."
+#   cost information, costs average $13,598 per treatment group member."
 #
-# "Interventions" here = studies (projects): 22 of the 33 training-primary
-# projects report cost information.
+# "Interventions" here = studies (projects).
+#
+# NOTE: §1.2's cost figure was updated to $13,598 in this revision (from
+# $13,046), consistent with the recent cost-concept refactor in 01/02_prep
+# (see commits "Refine cost concepts" and "Fix new factor of 1000 bug in cost
+# figures"). But Table 1's note in §6.5.1 and the sector-program comparison
+# in §7 ("$11,677 versus $13,046") were NOT updated and still show the old
+# $13,046 figure — see Chunk 10 below, which still targets $13,046 because
+# that's what Table 1's text currently says. This is a real inconsistency in
+# the write-up, worth flagging to the author.
 ###############################################################################
 
-cat("\n=== Chunk 4: Overview — $13,046 per treatment group member ===\n")
+cat("\n=== Chunk 4: §1.2 — $13,598 per treatment group member ===\n")
 
 cost_unwt_prim <- mean(dat$net_cost_narrow[primary_idx], na.rm = TRUE)
 prim_projects      <- unique(dat$project[primary_idx])
@@ -227,24 +232,24 @@ prim_cost_projects <- unique(dat$project[primary_idx][
 cov_pct <- 100 * length(prim_cost_projects) / length(prim_projects)
 
 report(
-  "67% of training-primary interventions report cost; cost averages $13,046",
-  "cost coverage ≈ 67% of training-primary studies; unweighted mean cost = $13,046",
+  "67% of training-primary interventions report cost; cost averages $13,598",
+  "cost coverage ≈ 67% of training-primary studies; unweighted mean cost = $13,598",
   sprintf("cost coverage = %d/%d projects = %.1f%%; mean cost = $%.0f (n = %d rows)",
           length(prim_cost_projects), length(prim_projects), cov_pct,
           cost_unwt_prim, sum(!is.na(dat$net_cost_narrow[primary_idx]))))
 
 ###############################################################################
-# CHUNK 5.  Overview — JTPA impacts for low-income adults
+# CHUNK 5.  §1.3 — JTPA impacts for low-income adults
 #
 #   "the Job Training Partnership Act (JTPA) lifted employment among low-income
 #   adults by about 2.3 points, from a base of about 70%. It lifted annual pay
 #   by $1,100 in 2025 dollars, from about $13,000 for women and $17,500 for
 #   men."
 #
-# Footnote 6: "Figures approximate average results for years 3-5."
+# Footnote 5: "Figures approximate average results for years 3-5."
 ###############################################################################
 
-cat("\n=== Chunk 5: Overview — JTPA Adult women + men ===\n")
+cat("\n=== Chunk 5: §1.3 — JTPA Adult women + men ===\n")
 
 jtpa_idx <- which(dat$project == "National JTPA Study" &
                   grepl("Adult", dat$site_subgroup))
@@ -278,7 +283,7 @@ report(
           jtpa_w_earn, jtpa_w_cm, jtpa_m_earn, jtpa_m_cm))
 
 ###############################################################################
-# CHUNK 6.  Overview / Executive summary — Job Corps long-term results
+# CHUNK 6.  §1.3 — Job Corps long-term results
 #
 #   "It did not affect employment or earnings in follow-ups extending 20 years,
 #   except for a transitory 1–2% employment bump in years 3–5 (Schochet 2020)."
@@ -306,12 +311,12 @@ report(
           jc$lt_emp_impact, jc$lt_followup_years))
 
 ###############################################################################
-# CHUNK 7.  Overview / Executive summary — WIA null results
+# CHUNK 7.  §1.3 — WIA null results
 #
 #   "An evaluation of the Workforce Investment Act, the successor to the JTPA,
 #   returned essentially zeros for the programs for low-income adults and for
-#   dislocated workers (Fortson et al. 2017)—by which we mean results that were
-#   as often negative as positive and lack statistical significance."
+#   dislocated workers (Fortson et al. 2017). Estimates were as often negative
+#   as positive and lack statistical significance."
 ###############################################################################
 
 cat("\n=== Chunk 7: WIA Gold Standard null results ===\n")
@@ -343,13 +348,17 @@ report(
   sprintf("Max |z| across all WIA impact estimates = %.2f", zmax))
 
 ###############################################################################
-# CHUNK 8.  Overview / §6.6 — take-up rates and the ITT/TOT gap
+# CHUNK 8.  §6.5.2 — take-up rates and the ITT/LATE gap
 #
 #   "In training-primary interventions, the experimental offer of entry is
 #   accepted 75% of the time, while only 9% of the control group manages to
 #   access the treatment. Dividing that difference, 66% ... the impact on
 #   participation in any training program is only 28%, because many control
-#   group members find alternative trainings."  (§6.6, Table 3.)
+#   group members find alternative trainings."  (§6.5.2, Table 2.)
+#
+# NB: the write-up now calls this ratio "LATE-program" / "LATE-training"
+# (previously "TOT-program" / "TOT-training"); the underlying take-up
+# differentials this chunk checks are unaffected by the renaming.
 #
 # program_takeup_impact is the treatment-control differential in take-up of the
 # tested program; program_takeup_control_mean is the control group's take-up.
@@ -372,16 +381,16 @@ report(
           any_diff["mean"], any_ctrl["mean"]))
 
 ###############################################################################
-# CHUNK 9.  §6.6 — sample size and counts
+# CHUNK 9.  §6.5.1 — sample size and counts
 #
-#   "Our sample consists of 57 studies. Of these, 24 report results for several
+#   "Our sample consists of 56 studies. Of these, 24 report results for several
 #   demographics, implementing organizations, or localities. This brings the
-#   number of impact estimates to 147."
+#   number of impact estimates to 146."
 #   "Roughly half the experiments cleared this hurdle: 33, with 78 impact
 #   estimates."
 ###############################################################################
 
-cat("\n=== Chunk 9: §6.6 — sample counts ===\n")
+cat("\n=== Chunk 9: §6.5.1 — sample counts ===\n")
 
 n_studies_full <- length(unique(dat$project))
 n_impacts_full <- nrow(dat)
@@ -390,8 +399,8 @@ n_impacts_prim <- length(primary_idx)
 n_multi <- sum(table(dat$project) > 1)
 
 report(
-  "Sample: 57 studies, 147 impacts; 24 with multiple rows",
-  "57 / 147 / 24",
+  "Sample: 56 studies, 146 impacts; 24 with multiple rows",
+  "56 / 146 / 24",
   sprintf("studies = %d, impact estimates = %d, projects with >1 row = %d",
           n_studies_full, n_impacts_full, n_multi))
 
@@ -402,7 +411,7 @@ report(
           n_studies_prim, n_impacts_prim))
 
 ###############################################################################
-# CHUNK 10.  §6.6 — Table 2 study-trait averages (training-primary)
+# CHUNK 10.  §6.5.1 — Table 1 study-trait averages (training-primary)
 #
 #   "Most aim to serve low-income people, with only 3–4% meant for dislocated
 #   workers. Where training is primary, classroom training is a component 90%
@@ -411,9 +420,13 @@ report(
 #   Nearly all studied interventions were publicly funded, but slightly less
 #   than half the training-primary interventions delegated local implementation
 #   to private organizations."
+#
+# NOTE: this $13,046 cost figure in Table 1's text is stale relative to
+# §1.2's updated $13,598 (see Chunk 4's note) — flagged here again since it
+# is verified directly against the data below.
 ###############################################################################
 
-cat("\n=== Chunk 10: §6.6 — Table 2 training-primary averages ===\n")
+cat("\n=== Chunk 10: §6.5.1 — Table 1 training-primary averages ===\n")
 
 pct <- function(x) 100 * mean(x, na.rm = TRUE)
 pct_eq <- function(x, lvl) 100 * mean(x == lvl, na.rm = TRUE)
@@ -440,42 +453,42 @@ report(
 
 report(
   "Classroom 90%, OJT 29% (training-primary)",
-  "Table 2 row 'Classroom training (%)' = 90, 'On-the-job training (%)' = 29",
+  "Table 1 row 'Classroom training (%)' = 90, 'On-the-job training (%)' = 29",
   sprintf("classroom = %.1f%%, OJT = %.1f%%",
           trait_check[["classroom training (% of prim)"]],
           trait_check[["on-the-job training (% of prim)"]]))
 
 report(
   "About 6 months in program, $13,046 per person offered treatment (training-primary)",
-  "treatment duration ~6 mo; cost ~$13,046 (Table 2)",
+  "treatment duration ~6 mo; cost ~$13,046 (Table 1; stale — see note above)",
   sprintf("duration = %.1f months; cost = $%.0f",
           trait_check[["treatment duration months (prim)"]],
           trait_check[["cost per treated (prim, 2025$)"]]))
 
 report(
   "Nearly all publicly funded; slightly less than half admin delegated to private (training-primary)",
-  "funding public (majority); admin private < 50% (Table 2)",
+  "funding public (majority); admin private < 50% (Table 1)",
   sprintf("public funding = %.1f%%; private admin = %.1f%%",
           trait_check[["funding public (% of prim)"]],
           trait_check[["admin private (% of prim)"]]))
 
 ###############################################################################
-# CHUNK 11.  §6.6 — Table 3 main impact lines
+# CHUNK 11.  §6.5.2 — Table 2 main impact lines
 #
 #   "From a base employment rate of about 60%, it boosts the chance of having a
 #   job by 2.5–2.9 points in the medium term (year 2) and 1.7–1.8 points in the
 #   longer term (the pairs of numbers being for all programs and training-
-#   primary ones). The average program lifts pre-tax earnings by 7.8% in medium
-#   term, meaning by $1,000–1,100/year from $12,500 in the full sample and
-#   $14,700 in the training-primary sample. The long-term earnings impacts are
-#   4.9%, i.e., $700–800 from bases of $14,400 and $16,100 (2025 dollars)."
+#   primary ones). The average program lifts pre-tax earnings by 7.8% in the
+#   medium term, meaning by $1,000–1,100/year from $12,500 in the full sample
+#   and $14,700 in the training-primary sample. The long-term earnings impacts
+#   are 4.9%, i.e., $700–800 from bases of $14,400 and $16,100 (2025 dollars)."
 #
-#   Summary bullet at the end of §6.6: "The ITT impacts are small, at about 2
+#   Summary bullet at the end of §6.5.5: "The ITT impacts are small, at about 2
 #   points of employment, and $1,000–1,100 in pre-tax earnings in year 2 and
 #   $700–800/year beyond."
 ###############################################################################
 
-cat("\n=== Chunk 11: §6.6 — medium- and long-term averages ===\n")
+cat("\n=== Chunk 11: §6.5.2 — medium- and long-term averages ===\n")
 
 mt_emp_full  <- remi(all_idx, "mt_emp_impact",  "mt_emp_se")
 lt_emp_full2 <- remi(all_idx, "lt_emp_impact",  "lt_emp_se")
@@ -486,14 +499,14 @@ mt_earn_cm_prim <- remi(primary_idx, "mt_earn_control_mean", "mt_earn_se")
 
 report(
   "boosts chance of having a job by 2.5-2.9 pts (MT) and 1.7-1.8 pts (LT)",
-  "Table 3: MT emp 2.5 (full)/2.9 (prim); LT emp is an ascending range 1.7–1.8 (full 1.84, prim 1.66)",
+  "Table 2: MT emp 2.5 (full)/2.9 (prim); LT emp is an ascending range 1.7–1.8 (full 1.84, prim 1.66)",
   sprintf("MT emp: full = %.2f, training-primary = %.2f; LT emp: full = %.2f, training-primary = %.2f",
           mt_emp_full["mean"], mt_emp_prim["mean"],
           lt_emp_full2["mean"], lt_emp_prim2["mean"]))
 
 report(
   "lifts earnings by $1,000-1,100/year in MT and $700-800 beyond",
-  "Table 3: MT earn $985 (full) to $1,139 (prim); LT earn $657 (full) to $791 (prim)",
+  "Table 2: MT earn $985 (full) to $1,139 (prim); LT earn $657 (full) to $791 (prim)",
   sprintf("MT earn: full = %.0f, training-primary = %.0f; LT earn: full = %.0f, training-primary = %.0f",
           mt_earn_full["mean"], mt_earn_prim["mean"],
           lt_earn_full2["mean"], lt_earn_prim2["mean"]))
@@ -516,13 +529,13 @@ report(
           mean(all_emp_pts)))
 
 ###############################################################################
-# CHUNK 12.  §6.6 — meta-regression: employment impact declining over time
+# CHUNK 12.  §6.5.4 — meta-regression: employment impact declining over time
 #
 #   "We see that the medium- and long-term impacts on employment have fallen by
-#   about 0.07 points per year since the 1970s."  (Table 4.)
+#   about 0.07 points per year since the 1970s."  (Table 3.)
 ###############################################################################
 
-cat("\n=== Chunk 12: §6.6 — declining employment impact over time ===\n")
+cat("\n=== Chunk 12: §6.5.4 — declining employment impact over time ===\n")
 
 regress_year <- function(idx, ycol, secol) {
   s <- sub(idx, ycol, secol)
@@ -547,15 +560,15 @@ lt_emp_yr_prim <- regress_year(primary_idx, "lt_emp_impact", "lt_emp_se")
 
 report(
   "MT and LT employment impact has fallen by about 0.07 pts/year since the 1970s",
-  "Table 4 randomization_year coefficients ≈ -0.07 (MT and LT, full and training-primary)",
+  "Table 3 randomization_year coefficients ≈ -0.07 (MT and LT, full and training-primary)",
   sprintf("MT-emp year coef: full = %.3f, prim = %.3f; LT-emp: full = %.3f, prim = %.3f (per year)",
           mt_emp_yr_full["b"], mt_emp_yr_prim["b"],
           lt_emp_yr_full["b"], lt_emp_yr_prim["b"]))
-cat("  (The full survivor meta-regressions of Table 4 — region, classroom,\n")
+cat("  (The full survivor meta-regressions of Table 3 — region, classroom,\n")
 cat("   dislocated-worker terms — are produced and reported by 03_tables.R.)\n")
 
 ###############################################################################
-# CHUNK 13.  §6.6 (Table 4 / survivors) — intellectual disabilities ~8 pts
+# CHUNK 13.  §6.5.4 (Table 3 / survivors) — intellectual disabilities ~8 pts
 #
 #   "The two programs that served people with intellectual disabilities boosted
 #   employment about 8 points in the long term."
@@ -569,7 +582,7 @@ cat("   dislocated-worker terms — are produced and reported by 03_tables.R.)\n
 # higher (~10) because the coefficient is adjusted for the other survivors.
 ###############################################################################
 
-cat("\n=== Chunk 13: §6.6 — intellectual-disability programs ===\n")
+cat("\n=== Chunk 13: §6.5.4 — intellectual-disability programs ===\n")
 
 dis_idx <- which(dat$target_pop == "disability")
 cat("Disability-target rows (raw, for context — not the verification basis):\n")
@@ -578,13 +591,13 @@ print(dat[dis_idx, c("project", "site_subgroup", "mt_emp_impact", "lt_emp_impact
 report(
   "Two disability-target programs boosted employment about 8 pts in the long term",
   "LT-emp survivor coefficient on target_popdisability ≈ 8 pts (see table_survivors_primary.*)",
-  paste("survivor coefficient computed by 03_tables.R (Table 4);",
+  paste("survivor coefficient computed by 03_tables.R (Table 3);",
         "current value ~8.2*** (LT emp, training-primary). Raw two-row mean",
         sprintf("(%.1f LT) is NOT the right comparison.",
                 mean(dat$lt_emp_impact[dis_idx], na.rm = TRUE))))
 
 ###############################################################################
-# CHUNK 14.  §6.6 — employer hiring commitment lifts earnings $8-9K
+# CHUNK 14.  §6.5.4 — employer hiring commitment lifts earnings $8-9K
 #
 #   "And the apparently powerful impact of an employer committing to hire
 #   graduates—$8,000–9,000 in year 2 and beyond—owes to three programs: the
@@ -592,7 +605,7 @@ report(
 #   Training Partnership."
 ###############################################################################
 
-cat("\n=== Chunk 14: §6.6 — employer-hiring-commitment programs ===\n")
+cat("\n=== Chunk 14: §6.5.4 — employer-hiring-commitment programs ===\n")
 
 hire_idx <- which(dat$employerol_hire == 1)
 cat("Employer-hiring-commitment rows:\n")
@@ -615,8 +628,8 @@ report(
 #
 #   "sector programs on average cause a partially transient employment bump,
 #   about 2.9 points, and a more permanent increase in pre-tax pay,
-#   $3,000–4,000/year in 2025 dollars." (Figures 16, 17.)
-#   "their costs do not: $11,677 per treatment group member ..." (Table 7.)
+#   $3,000–4,000/year in 2025 dollars." (Figures 13, 14.)
+#   "their costs do not: $11,677 per treatment group member ..." (Table 6.)
 #   "The average sector experiment generated a 56-point differential in
 #   participation in the program being evaluated ... the impact on take-up of
 #   any training is about 25%."
@@ -639,7 +652,7 @@ sec_any_diff  <- remi(sec_idx, "any_training_impact",   "any_training_se")
 
 report(
   "Sector programs: ~2.9 pts emp bump (MT), $3,000-4,000/year pay",
-  "MT emp ~2.9 pts; MT earn ~$3,100; LT earn ~$3,700 (Figures 16, 17)",
+  "MT emp ~2.9 pts; MT earn ~$3,100; LT earn ~$3,700 (Figures 13, 14)",
   sprintf("MT emp = %.2f (k=%d); LT emp = %.2f (k=%d); MT earn = %.0f (k=%d); LT earn = %.0f (k=%d)",
           mt_emp_sec["mean"], mt_emp_sec["k"],
           lt_emp_sec["mean"], lt_emp_sec["k"],
@@ -657,7 +670,7 @@ report(
 # CHUNK 16.  §7 — Year Up gap of about $2,000/quarter
 #
 #   "Thereafter the gap between the two holds steady at around $2,000 per
-#   quarter per treatment group member." (Figure 15.)
+#   quarter per treatment group member." (Figure 12.)
 ###############################################################################
 
 cat("\n=== Chunk 16: §7 — Year Up ~$2,000/quarter gap ===\n")
@@ -711,18 +724,18 @@ report(
           lt_earn_sec["mean"] / lt_earn_full2["mean"]))
 
 ###############################################################################
-# CHUNK 19.  Conclusion — long-term impacts 1.7-1.8 pts, $700-800/yr
+# CHUNK 19.  §8 (major findings) — long-term impacts 1.7-1.8 pts, $700-800/yr
 #
 #   "In a new meta-analysis of randomized studies in the US, the long-term ITT
 #   impacts of job training average 1.7–1.8 points of employment and
 #   $700–800/year in income."
 ###############################################################################
 
-cat("\n=== Chunk 19: Conclusion — LT averages ===\n")
+cat("\n=== Chunk 19: §8 — LT averages ===\n")
 
 report(
   "LT impacts: 1.7-1.8 pts employment and $700-800/year",
-  "Table 3 LT row: emp ascending range 1.7–1.8 (full 1.84, prim 1.66); earn $657 (full)/$791 (prim)",
+  "Table 2 LT row: emp ascending range 1.7–1.8 (full 1.84, prim 1.66); earn $657 (full)/$791 (prim)",
   sprintf("LT emp: full = %.2f, training-primary = %.2f; LT earn: full = %.0f, training-primary = %.0f",
           lt_emp_full["mean"], lt_emp_prim["mean"],
           lt_earn_full["mean"], lt_earn_prim["mean"]))
