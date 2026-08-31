@@ -1547,12 +1547,17 @@ build_traits_rows <- function() {
   rows
 }
 
-# ── Stacked-cell variant (used by the outcomes table only) ───────────────────
-# Each group renders as two columns instead of three: an estimate column that
-# stacks the SD/SE under the point estimate in parentheses, plus an N column.
+# ── Dual-column variant (used by the outcomes table only) ────────────────────
+# Each group renders as three columns: the control-group mean (with SD
+# stacked underneath in parentheses), the impact estimate (with SE stacked
+# underneath), and a single shared N. This puts each outcome's impact
+# directly to the right of its control-group mean instead of in a separate
+# "Impacts" section below. Control-group and impact N are (by construction)
+# the same set of studies — both are filtered on the same non-missing impact
+# SE — so only one N column is kept per group, sourced from the impact side.
 # The descriptives table keeps the side-by-side Mean/SD/N layout above.
-desc_col_ids_stacked <- unlist(lapply(desc_groups, function(g)
-  paste0(g$prefix, c("_mean", "_n"))))
+desc_col_ids_dual <- unlist(lapply(desc_groups, function(g)
+  paste0(g$prefix, c("_ctrl_mean", "_impact_mean", "_n"))))
 
 fmt_v_cells_stacked <- function(stats, digits = 2, big_mark = "") {
   if (is.na(stats[["mean"]])) return(c("–", ""))
@@ -1566,46 +1571,39 @@ fmt_v_cells_stacked <- function(stats, digits = 2, big_mark = "") {
            else as.character(stats[["n"]])
   c(est, n_str)
 }
-fmt_row_stacked <- function(label, vals, digits = 2) {
+fmt_row_dual <- function(label, ctrl_vals, impact_vals, digits = 2) {
   big_mark <- if (grepl("\\$|sample size", label, ignore.case = TRUE)) ","
               else ""
-  cells <- unlist(lapply(vals, fmt_v_cells_stacked, digits = digits,
-                         big_mark = big_mark))
+  cells <- unlist(lapply(seq_along(ctrl_vals), function(i) {
+    ctrl_cells   <- fmt_v_cells_stacked(ctrl_vals[[i]],   digits = digits, big_mark = big_mark)
+    impact_cells <- fmt_v_cells_stacked(impact_vals[[i]], digits = digits, big_mark = big_mark)
+    c(ctrl_cells[1], impact_cells[1], impact_cells[2])
+  }))
   out <- c(sprintf("  %s", label), cells)
-  names(out) <- c("variable", desc_col_ids_stacked)
+  names(out) <- c("variable", desc_col_ids_dual)
   out
 }
-blank_row_stacked <- function() {
-  bv <- rep("", length(desc_col_ids_stacked) + 1L)
-  names(bv) <- c("variable", desc_col_ids_stacked)
-  list(values = bv, type = "blank")
-}
-section_row_stacked <- function(title) {
-  sr <- c(title, rep("", length(desc_col_ids_stacked)))
-  names(sr) <- c("variable", desc_col_ids_stacked)
-  list(values = sr, type = "section")
-}
 
-# Header for the stacked layout: super-header per group spanning 2 columns,
-# sub-headers "Mean" / "N" (the SD/SE now sits under the mean in parentheses).
-apply_desc_headers_stacked <- function(ft, groups) {
+# Header for the dual layout: super-header per group spanning 3 columns,
+# sub-headers "Control mean" / "Impact" / "N".
+apply_desc_headers_dual <- function(ft, groups) {
   ids   <- unlist(lapply(groups, function(g)
-    paste0(g$prefix, c("_mean", "_n"))))
-  jdata <- 2:(length(ids) + 1L)             # data columns (2 per group)
-  sub <- setNames(as.list(rep(c("Mean", "N"), length(groups))), ids)
+    paste0(g$prefix, c("_ctrl_mean", "_impact_mean", "_n"))))
+  jdata <- 2:(length(ids) + 1L)             # data columns (3 per group)
+  sub <- setNames(as.list(rep(c("Control mean", "Impact", "N"), length(groups))), ids)
   ft <- set_header_labels(ft, values = c(list(variable = ""), sub))
   ft <- add_header_row(ft,
     values    = c("", vapply(groups, `[[`, "", "header")),
-    colwidths = c(1, rep(2, length(groups))),
+    colwidths = c(1, rep(3, length(groups))),
     top       = TRUE)
   ft <- bold(ft, j = jdata, part = "header")
   ft <- align(ft, j = jdata, align = "center", part = "header")
-  ft <- width(ft, j = 1, width = 2.8)
-  # Estimate columns (odd positions within jdata) wider than the N columns.
-  mean_j <- jdata[seq(1, length(jdata), by = 2)]
-  n_j    <- jdata[seq(2, length(jdata), by = 2)]
-  ft <- width(ft, j = mean_j, width = 1.05)
-  ft <- width(ft, j = n_j,    width = 0.55)
+  ft <- width(ft, j = 1, width = 2.6)
+  # Estimate columns wider than the shared N column (every 3rd position).
+  n_j    <- jdata[seq(3, length(jdata), by = 3)]
+  mean_j <- setdiff(jdata, n_j)
+  ft <- width(ft, j = mean_j, width = 0.75)
+  ft <- width(ft, j = n_j,    width = 0.35)
   thin_rule <- fp_border(color = "black", width = 0.5)
   ft <- hline(ft, i = 1, j = jdata, part = "header", border = thin_rule)
   ft <- padding(ft, padding.top = 1, part = "footer")
@@ -1627,27 +1625,21 @@ build_outcomes_rows <- function() {
   )
   # Control-group means and impacts both use REML on the reported per-study
   # impact SE: same weights study-by-study, just a different `yi`.
-  reml_section <- function(yi_suffix) {
-    function(oc) {
-      oc_type <- oc[[1]]; hz <- oc[[2]]; lab <- oc[[3]]; digits_oc <- oc[[4]]
-      # First-stage outcomes (hz == "") carry no time-horizon prefix.
-      colbase <- if (hz == "") oc_type else paste0(hz, "_", oc_type)
-      y_col  <- paste0(colbase, "_", yi_suffix)
-      se_col <- paste0(colbase, "_se")
-      vals <- lapply(desc_groups, function(g)
-        ms_reml(dat[[y_col]][g$idx], dat[[se_col]][g$idx],
-                dat$project[g$idx]))
-      list(values = fmt_row_stacked(lab, vals, digits = digits_oc),
-           type = "coef")
-    }
+  outcome_row <- function(oc) {
+    oc_type <- oc[[1]]; hz <- oc[[2]]; lab <- oc[[3]]; digits_oc <- oc[[4]]
+    # First-stage outcomes (hz == "") carry no time-horizon prefix.
+    colbase <- if (hz == "") oc_type else paste0(hz, "_", oc_type)
+    se_col <- paste0(colbase, "_se")
+    ctrl_vals <- lapply(desc_groups, function(g)
+      ms_reml(dat[[paste0(colbase, "_control_mean")]][g$idx],
+              dat[[se_col]][g$idx], dat$project[g$idx]))
+    impact_vals <- lapply(desc_groups, function(g)
+      ms_reml(dat[[paste0(colbase, "_impact")]][g$idx],
+              dat[[se_col]][g$idx], dat$project[g$idx]))
+    list(values = fmt_row_dual(lab, ctrl_vals, impact_vals, digits = digits_oc),
+         type = "coef")
   }
-  rows <- list()
-  rows[[length(rows) + 1]] <- section_row_stacked("Control-group means")
-  for (oc in outcomes) rows[[length(rows) + 1]] <- reml_section("control_mean")(oc)
-  rows[[length(rows) + 1]] <- blank_row_stacked()
-  rows[[length(rows) + 1]] <- section_row_stacked("Impacts")
-  for (oc in outcomes) rows[[length(rows) + 1]] <- reml_section("impact")(oc)
-  rows
+  lapply(outcomes, outcome_row)
 }
 
 write_desc_table <- function(rows, groups, basename, caption, footer,
@@ -1692,6 +1684,6 @@ write_desc_table(
   caption  = "Control groups means and impact estimates in U.S.-based job training experiments",
   footer   = paste(
     'Notes: Impacts are estimated with random-effects maximum likelihood (REML) meta-analysis. Control-group statistics are computed using the corresponding REML weights. Figures in parentheses below each estimate are standard deviations of control-group values and standard errors of impact estimates. Sample sizes vary because of missing data. Short-term outcomes have a ~1-year fol-low-up, medium-term ~2 years, and long-term ~3-5 years.'),
-  header_fn = apply_desc_headers_stacked)
+  header_fn = apply_desc_headers_dual)
 
 cat("\nAll tables written.\n")
